@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "fileutils"
+require "config"
+require "fedibird_api"
+require "html_text"
+require "title_rules"
+
+count = (ARGV[0] || "200").to_i
+config = SnsMultipost::Config.load
+api = SnsMultipost::FedibirdApi.new(
+  base_url: config["fedibird"]["base_url"],
+  access_token: config["fedibird"]["access_token"])
+titles = SnsMultipost::TitleRules.load
+
+rows = []
+max_id = nil
+while rows.size < count
+  batch = api.statuses(
+    account_id: config["fedibird"]["account_id"], max_id: max_id, limit: 40)
+  break if batch.empty?
+  batch.each do |st|
+    next if st["reblog"] || st["in_reply_to_id"]
+    text = SnsMultipost::HtmlText.to_text(st["content"].to_s)
+    next if text.empty?
+    rows << [titles.title_for(text), text.gsub(/\s+/, " ")[0, 40]]
+    break if rows.size >= count
+  end
+  max_id = batch.last["id"]
+end
+
+out = rows.map { |r| r.join("\t") }.join("\n")
+puts out
+dir = File.expand_path("../logs", __dir__)
+FileUtils.mkdir_p(dir)
+path = File.join(dir, "dryrun_titles_#{Time.now.strftime('%Y%m%d-%H%M%S')}.tsv")
+File.write(path, out)
+puts "\nsaved: #{path}"
