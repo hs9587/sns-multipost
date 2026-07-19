@@ -1,0 +1,10 @@
+config.yml
+state/
+logs/
+queue/*
+done/*
+failed/*
+!queue/.keep
+!done/.keep
+!failed/.keep
+Gemfile.lock
