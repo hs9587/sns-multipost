@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "config"
+require "fedibird_api"
+
+config = SnsMultipost::Config.load
+me = SnsMultipost::FedibirdApi.new(
+  base_url: config["fedibird"]["base_url"],
+  access_token: config["fedibird"]["access_token"]).verify_credentials
+puts "account_id: #{me['id']}"
+puts "acct: @#{me['acct']}"

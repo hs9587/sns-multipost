@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "config"
+require "job_queue"
+require "title_rules"
+require "self_posted"
+require "fedibird_api"
+require "watch"
+
+config = SnsMultipost::Config.load
+watch = SnsMultipost::Watch.new(
+  config: config,
+  api: SnsMultipost::FedibirdApi.new(
+    base_url: config["fedibird"]["base_url"],
+    access_token: config["fedibird"]["access_token"]),
+  queue: SnsMultipost::JobQueue.new,
+  titles: SnsMultipost::TitleRules.load,
+  self_posted: SnsMultipost::SelfPosted.new,
+  state_path: File.expand_path("../state/since_id.txt", __dir__),
+  media_root: File.expand_path("../state/media", __dir__))
+count = watch.run
+puts "new statuses: #{count}"

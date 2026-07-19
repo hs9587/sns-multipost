@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "config"
+require "job_queue"
+require "runner"
+require "poster/all"
+
+config = SnsMultipost::Config.load
+results = SnsMultipost::Runner.new(
+  config: config, queue: SnsMultipost::JobQueue.new).run
+results.each do |job, status, detail|
+  puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+end
+puts "ok=#{results.count { |r| r[1] == :ok }} failed=#{results.count { |r| r[1] == :failed }}"

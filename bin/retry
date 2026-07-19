@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "config"
+require "job_queue"
+require "runner"
+require "poster/all"
+
+abort "使い方: ruby bin/retry failed/xxxx.json ..." if ARGV.empty?
+
+config = SnsMultipost::Config.load
+queue = SnsMultipost::JobQueue.new
+requeued = ARGV.map { |p| queue.requeue(File.expand_path(p)) }
+jobs = queue.pending.select { |j| requeued.include?(j.path) }
+results = SnsMultipost::Runner.new(config: config, queue: queue).run(jobs)
+results.each do |job, status, detail|
+  puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+end

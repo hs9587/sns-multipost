@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "time"
+require "config"
+require "job_queue"
+require "title_rules"
+
+text = ARGV.join(" ").strip
+abort '使い方: ruby bin/post "本文"' if text.empty?
+
+config = SnsMultipost::Config.load
+queue = SnsMultipost::JobQueue.new
+title = SnsMultipost::TitleRules.load.title_for(text)
+
+config.targets_for(:post).each do |sns|
+  path = queue.enqueue(SnsMultipost::Job.new(
+    sns: sns, text: text, title: title, created_at: Time.now.iso8601))
+  puts "queued: #{path}"
+end
+puts "次: ruby bin/run_queue"
