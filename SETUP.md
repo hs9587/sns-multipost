@@ -13,3 +13,9 @@
 1. Bluesky にログイン → 設定 → プライバシーとセキュリティ → アプリパスワード → 追加
 2. 発行された app password を config.yml の `bluesky.app_password` に記入
 3. `bluesky.handle` に自分のハンドル（例 you.bsky.social）を記入
+
+## Tumblr のトークン
+
+1. https://www.tumblr.com/oauth/apps でアプリを登録し OAuth2 consumer key/secret を取得
+2. OAuth2 の認可フローでアクセストークンを取得（scope: write）。取得したトークンを config.yml の `tumblr.access_token` に記入
+3. `tumblr.blog_identifier` に投稿先ブログ（例 you.tumblr.com）を記入

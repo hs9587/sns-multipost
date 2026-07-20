@@ -9,10 +9,15 @@ bluesky:
   handle: "you.bsky.social"      # あなたのハンドル
   app_password: ""               # 設定 > プライバシーとセキュリティ > アプリパスワード で発行
 
+tumblr:
+  access_token: ""               # Tumblr の OAuth2 アクセストークン
+  blog_identifier: "you.tumblr.com"  # 投稿先ブログ（例 you.tumblr.com）
+
 # 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる
 targets:
   - fedibird
   - bluesky
+  - tumblr
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true
