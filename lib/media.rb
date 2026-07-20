@@ -10,6 +10,11 @@ module SnsMultipost
       "jotter" => 0
     }.freeze
     DEFAULT_LIMIT = 1
+    # SNS 別の画像1枚あたりバイト上限。ここに無い SNS は無制限
+    SIZE_LIMITS = {
+      "bluesky" => 1_000_000,
+      "x" => 5_000_000
+    }.freeze
 
     def self.limit_for(sns)
       LIMITS.fetch(sns, DEFAULT_LIMIT)
@@ -17,6 +22,17 @@ module SnsMultipost
 
     def self.for_sns(paths, sns)
       paths.first(limit_for(sns))
+    end
+
+    # sns のサイズ上限を超える画像を除外する。logger が与えられれば除外を通知
+    def self.within_size(paths, sns, logger: nil)
+      limit = SIZE_LIMITS[sns]
+      return paths unless limit
+      paths.select do |p|
+        ok = File.size(p) <= limit
+        logger&.call("skip oversized image for #{sns}: #{p} (#{File.size(p)} bytes > #{limit})") unless ok
+        ok
+      end
     end
 
     def self.download(urls, dest_dir, fetcher: ->(u) { URI.open(u, "rb", &:read) })
