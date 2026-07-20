@@ -22,4 +22,14 @@
 - Phase 3: ブラウザ組（Instagram / mixi / mixi2 / Jotter.me）
 - Phase 4: 手順書整備・本番運用
 
-構成・使い方は実装の進行に合わせて追記する。
+## 使い方（Phase 1: Fedibird のみ）
+
+    ruby bin/post "本文"          # 手動投稿（キュー生成）
+    ruby bin/run_queue            # キュー処理（実投稿）
+    ruby bin/watch                # Fedibird 新着検出 → キュー生成
+    ruby bin/retry failed/x.json  # 失敗ジョブの再実行
+    ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
+    ruby bin/whoami               # account_id 確認
+
+設定は `config.sample.yml` を `config.yml` にコピーして記入する（`config.yml` はコミットされない）。
+設計は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md) を参照。
