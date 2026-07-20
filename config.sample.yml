@@ -9,9 +9,10 @@ bluesky:
   handle: "you.bsky.social"      # あなたのハンドル
   app_password: ""               # 設定 > プライバシーとセキュリティ > アプリパスワード で発行
 
-# 投稿先。ポスター実装済みの SNS だけ並べる（Phase 1 は fedibird のみ）
+# 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる
 targets:
   - fedibird
+  - bluesky
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true
