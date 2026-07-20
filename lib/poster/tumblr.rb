@@ -16,7 +16,7 @@ module SnsMultipost
         paths = Media.within_size(Media.for_sns(job.media_paths, "tumblr"), "tumblr",
                                   logger: @logger)
         res = api.create_post(job.text.to_s, image_paths: paths)
-        id = res["response"]["id_string"]
+        id = res["response"]["id"].to_s
         { id: id, url: post_url(id) }
       end
 

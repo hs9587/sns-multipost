@@ -7,7 +7,8 @@ class PosterTumblrTest < Minitest::Test
     attr_reader :posted
     def create_post(text, image_paths: [])
       @posted = { text: text, image_paths: image_paths }
-      { "response" => { "id" => 555, "id_string" => "555" } }
+      # Tumblr NPF レスポンスは response.id（文字列）を返す。id_string キーは無い
+      { "meta" => { "status" => 201 }, "response" => { "id" => "555", "state" => "published" } }
     end
   end
 
