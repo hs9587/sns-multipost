@@ -40,24 +40,28 @@ class TumblrApiTest < Minitest::Test
 
   def test_post_with_images_uses_multipart_and_identifiers
     Dir.mktmpdir do |dir|
-      a = File.join(dir, "a.jpg"); File.binwrite(a, "AAA")
-      b = File.join(dir, "b.png"); File.binwrite(b, "BBB")
+      # 非ASCIIバイトを含む実バイナリ的フィクスチャ（\xFF\xD8\xFF は JPEG SOI 相当）。
+      # UTF-8 の日本語キャプションとバイナリ画像を同じバッファで連結しても
+      # Encoding::CompatibilityError が起きないことを検証する。
+      a = File.join(dir, "a.jpg"); File.binwrite(a, "\xFF\xD8\xFF".b + "AAA")
+      b = File.join(dir, "b.png"); File.binwrite(b, "\x89PNG\r\n".b + "BBB")
       t, calls = fake([[201, JSON.generate("response" => { "id" => 9, "id_string" => "9" })]])
       api(t).create_post("写真だよ", image_paths: [a, b])
       c = calls.first
+      body = c[:body].b
       assert_match(%r{multipart/form-data; boundary=}, c[:ctype])
       # json パートに content（text + image ブロック）が入る
-      assert_includes c[:body], "name=\"json\""
-      assert_includes c[:body], "\"identifier\":\"image-0\""
-      assert_includes c[:body], "\"identifier\":\"image-1\""
+      assert_includes body, "name=\"json\""
+      assert_includes body, "\"identifier\":\"image-0\""
+      assert_includes body, "\"identifier\":\"image-1\""
       # 画像パートがフィールド名 image-0 / image-1 で入る
-      assert_includes c[:body], "name=\"image-0\"; filename=\"a.jpg\""
-      assert_includes c[:body], "name=\"image-1\"; filename=\"b.png\""
-      assert_includes c[:body], "AAA"
-      assert_includes c[:body], "BBB"
+      assert_includes body, "name=\"image-0\"; filename=\"a.jpg\""
+      assert_includes body, "name=\"image-1\"; filename=\"b.png\""
+      assert_includes body, "\xFF\xD8\xFF".b + "AAA"
+      assert_includes body, "\x89PNG\r\n".b + "BBB"
       # image ブロックの MIME
-      assert_includes c[:body], "\"type\":\"image/jpeg\""
-      assert_includes c[:body], "\"type\":\"image/png\""
+      assert_includes body, "\"type\":\"image/jpeg\""
+      assert_includes body, "\"type\":\"image/png\""
     end
   end
 

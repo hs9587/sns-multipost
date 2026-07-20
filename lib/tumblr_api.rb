@@ -47,11 +47,11 @@ module SnsMultipost
 
     def build_multipart(path, body_json, image_paths)
       boundary = "----SnsMultipost#{SecureRandom.hex(8)}"
-      body = +""
+      body = "".b
       body << "--#{boundary}\r\n"
       body << "Content-Disposition: form-data; name=\"json\"\r\n"
       body << "Content-Type: application/json\r\n\r\n"
-      body << body_json << "\r\n"
+      body << body_json.b << "\r\n"
       image_paths.each_with_index do |p, i|
         body << "--#{boundary}\r\n"
         body << "Content-Disposition: form-data; name=\"image-#{i}\"; filename=\"#{File.basename(p)}\"\r\n"
