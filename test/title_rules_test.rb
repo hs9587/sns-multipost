@@ -35,9 +35,27 @@ class TitleRulesTest < Minitest::Test
                  @rules.title_for("紅茶をいただきながらのんびり過ごす")
   end
 
+  def test_iced_tea_is_not_coffee
+    # アイス/ホットの語だけでは非コーヒー飲料をコーヒー扱いしない
+    assert_equal "アイスティーで休憩", @rules.title_for("アイスティーで休憩")
+    assert_equal "和栗のモンブラン、アイス…",
+                 @rules.title_for("和栗のモンブラン、アイスルイボスティー。")
+  end
+
+  def test_explicit_coffee_word_wins_even_with_tea
+    # コーヒーの明確な語があればお茶が同居してもコーヒー
+    assert_equal "アイス", @rules.title_for("アイスコーヒーとアイスティー")
+  end
+
   def test_food_first_in_text_order
     assert_equal "そば", @rules.title_for("まずそば、それからおにぎり")
     assert_equal "パン", @rules.title_for("今日のお昼はパンとスープ")
+  end
+
+  def test_bread_priority_over_other_food
+    # パン・ブレッドは主菜や他の食べ物語より優先
+    assert_equal "パン", @rules.title_for("カレーの後にくるみパン")
+    assert_equal "ブレッド", @rules.title_for("煮込みハンバーグ、バナナブレッド")
   end
 
   def test_fallback_truncates_to_12_chars

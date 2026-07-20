@@ -25,16 +25,19 @@ module SnsMultipost
 
     def coffee(text)
       c = @r["coffee"]
+      modifiers = c["modifiers"] || []
       non_coffee = c["non_coffee_drinks"].any? { |w| text.include?(w) }
-      vocab_hit = c["vocab"].any? { |w| text.include?(w) }
-      shop_hit = c["shops"].any? { |w| text.include?(w) }
-      return nil unless vocab_hit || (shop_hit && !non_coffee)
+      # 明確なコーヒー語（アイス/ホットの温度修飾語を除いた語彙）
+      strong = (c["vocab"] - modifiers).any? { |w| text.include?(w) }
+      # 温度修飾語や店名のみが手がかりのときは、非コーヒー飲料語があればよける
+      weak = modifiers.any? { |w| text.include?(w) } || c["shops"].any? { |w| text.include?(w) }
+      return nil unless strong || (weak && !non_coffee)
       return "アイス" if c["iced"].any? { |w| text.include?(w) }
       first_in_text(text, c["brands"]) || "ホット"
     end
 
     def food(text)
-      first_in_text(text, @r["foods"])
+      first_in_text(text, @r["foods_priority"] || []) || first_in_text(text, @r["foods"])
     end
 
     def first_in_text(text, words)
