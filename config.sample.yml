@@ -5,6 +5,10 @@ fedibird:
   access_token: "Fedibird の 設定 > 開発 で作成したアクセストークン"
   account_id: "自分のアカウントID（数字）。ruby bin/whoami で確認できる"
 
+bluesky:
+  handle: "you.bsky.social"      # あなたのハンドル
+  app_password: ""               # 設定 > プライバシーとセキュリティ > アプリパスワード で発行
+
 # 投稿先。ポスター実装済みの SNS だけ並べる（Phase 1 は fedibird のみ）
 targets:
   - fedibird
