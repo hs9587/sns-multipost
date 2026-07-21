@@ -61,6 +61,8 @@ class XApiTest < Minitest::Test
       assert c[:auth].start_with?("OAuth ")
       assert_includes c[:body], "name=\"media\""
       assert_includes c[:body], "PNGBYTES"
+      assert_includes c[:body], "name=\"media_category\""
+      assert_includes c[:body], "tweet_image"
     end
   end
 

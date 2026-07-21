@@ -35,6 +35,9 @@ module SnsMultipost
       boundary = "----SnsMultipost#{SecureRandom.hex(8)}"
       body = "".b
       body << "--#{boundary}\r\n".b
+      body << "Content-Disposition: form-data; name=\"media_category\"\r\n\r\n".b
+      body << "tweet_image\r\n".b
+      body << "--#{boundary}\r\n".b
       body << "Content-Disposition: form-data; name=\"media\"; filename=\"#{File.basename(path)}\"\r\n".b
       body << "Content-Type: application/octet-stream\r\n\r\n".b
       body << File.binread(path)
