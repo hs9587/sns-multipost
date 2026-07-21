@@ -61,4 +61,20 @@ class WatchTest < Minitest::Test
       assert_equal "5", File.read(File.join(dir, "since_id.txt"))
     end
   end
+
+  def test_threads_media_urls_into_jobs
+    Dir.mktmpdir do |dir|
+      statuses = [
+        { "id" => "9", "content" => "<p>写真つき</p>", "url" => "u9",
+          "media_attachments" => [{ "url" => "https://media.example/a.jpg" },
+                                  { "url" => "https://media.example/b.jpg" }] },
+      ]
+      watch, queue = build_watch(dir, statuses: statuses, targets: %w[bluesky])
+      File.write(File.join(dir, "since_id.txt"), "0")
+      watch.run
+      job = queue.pending.first
+      assert_equal ["https://media.example/a.jpg", "https://media.example/b.jpg"],
+                   job.media_urls
+    end
+  end
 end

@@ -59,7 +59,8 @@ module SnsMultipost
         end
       @config.targets_for(:watch).each do |sns|
         @queue.enqueue(
-          Job.new(sns: sns, text: text, title: title, media_paths: media_paths,
+          Job.new(sns: sns, text: text, title: title,
+                  media_paths: media_paths, media_urls: urls,
                   source_url: st["url"], created_at: now.iso8601),
           now: now)
       end

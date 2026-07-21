@@ -4,7 +4,7 @@ require "fileutils"
 
 module SnsMultipost
   class Job
-    ATTRS = %w[sns text title media_paths source_url attempts last_error created_at].freeze
+    ATTRS = %w[sns text title media_paths media_urls source_url attempts last_error created_at].freeze
     attr_accessor(*ATTRS.map(&:to_sym))
     attr_reader :path
 
@@ -15,6 +15,7 @@ module SnsMultipost
       end
       @attempts ||= 0
       @media_paths ||= []
+      @media_urls ||= []
       @path = path
     end
 
