@@ -19,3 +19,10 @@
 1. https://www.tumblr.com/oauth/apps でアプリを登録し OAuth2 consumer key/secret を取得
 2. OAuth2 の認可フローでアクセストークンを取得（scope: write）。取得したトークンを config.yml の `tumblr.access_token` に記入
 3. `tumblr.blog_identifier` に投稿先ブログ（例 you.tumblr.com）を記入
+
+## Blogger のトークン
+
+1. Google Cloud Console でプロジェクトを作り、Blogger API v3 を有効化
+2. OAuth 同意画面を設定し、OAuth2 クライアント（デスクトップ/ウェブ）を作成 → client_id/client_secret を取得
+3. scope `https://www.googleapis.com/auth/blogger` で認可し、refresh token を取得（`access_type=offline`）。config.yml の `blogger.client_id`/`client_secret`/`refresh_token` に記入
+4. `blogger.blog_id` に対象ブログの数値ID を記入（Blogger 管理画面のURL等で確認できる）

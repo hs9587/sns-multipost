@@ -13,11 +13,18 @@ tumblr:
   access_token: ""               # Tumblr の OAuth2 アクセストークン
   blog_identifier: "you.tumblr.com"  # 投稿先ブログ（例 you.tumblr.com）
 
+blogger:
+  client_id: ""                  # Google Cloud の OAuth2 クライアントID
+  client_secret: ""              # 同シークレット
+  refresh_token: ""              # scope=blogger の refresh token
+  blog_id: ""                    # Blogger のブログID（数字）
+
 # 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる
 targets:
   - fedibird
   - bluesky
   - tumblr
+  - blogger
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true
