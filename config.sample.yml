@@ -19,12 +19,20 @@ blogger:
   refresh_token: ""              # scope=blogger の refresh token
   blog_id: ""                    # Blogger のブログID（数字）
 
+x:
+  consumer_key: ""               # X 開発者ポータルの API Key
+  consumer_secret: ""            # 同 API Key Secret
+  access_token: ""               # ユーザーのアクセストークン
+  access_token_secret: ""        # 同シークレット
+  username: "you"                # URL 組立用（@ 抜きのユーザー名）
+
 # 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる
 targets:
   - fedibird
   - bluesky
   - tumblr
   - blogger
+  - x
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true

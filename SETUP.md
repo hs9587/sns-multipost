@@ -26,3 +26,13 @@
 2. OAuth 同意画面を設定し、OAuth2 クライアント（デスクトップ/ウェブ）を作成 → client_id/client_secret を取得
 3. scope `https://www.googleapis.com/auth/blogger` で認可し、refresh token を取得（`access_type=offline`）。config.yml の `blogger.client_id`/`client_secret`/`refresh_token` に記入
 4. `blogger.blog_id` に対象ブログの数値ID を記入（Blogger 管理画面のURL等で確認できる）
+
+## X（Twitter）のトークン
+
+X はメディアアップロードが OAuth1.0a 必須のため、投稿も OAuth1.0a に統一する。
+
+1. https://developer.x.com/ でアプリを作成し、アプリ権限を Read and write にする
+2. API Key / API Key Secret（= consumer_key / consumer_secret）を取得
+3. 同じアプリで Access Token / Access Token Secret を発行（Read and write 権限で）→ access_token / access_token_secret
+4. config.yml の `x` ブロックに4つの値と `username`（@ 抜き）を記入
+5. 無料枠は投稿数の上限が小さい。枠を使い切ると 429 が返る点に注意
