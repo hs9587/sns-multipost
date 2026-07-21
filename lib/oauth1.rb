@@ -1,6 +1,5 @@
 # lib/oauth1.rb
 require "openssl"
-require "base64"
 require "securerandom"
 
 module SnsMultipost
@@ -33,7 +32,8 @@ module SnsMultipost
         .join("&")
       base = [method.to_s.upcase, escape(url), escape(param_string)].join("&")
       signing_key = "#{escape(consumer_secret)}&#{escape(token_secret)}"
-      signature = Base64.strict_encode64(OpenSSL::HMAC.digest("SHA1", signing_key, base))
+      # strict base64（改行なし）を stdlib の Array#pack で。base64 gem 非依存
+      signature = [OpenSSL::HMAC.digest("SHA1", signing_key, base)].pack("m0")
       header = oauth.merge("oauth_signature" => signature)
       "OAuth " + header.sort.map { |k, v| "#{escape(k)}=\"#{escape(v)}\"" }.join(", ")
     end
