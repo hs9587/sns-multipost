@@ -27,8 +27,10 @@ class TokenStoreTest < Minitest::Test
       store.save("v" => 1)
       store.save("v" => 2)
       assert_equal({ "v" => 2 }, store.load)
-      # 一時ファイルが残っていない（json はちょうど1つ）
-      assert_equal [path], Dir[File.join(dir, "*")].select { |p| File.file?(p) }
+      # 一時ファイル（.tok.json.tmp 等の隠しファイル）が残っていない。
+      # Dir.children は隠しファイルも含む（. と .. は除く）ので残渣を確実に検査できる
+      files = Dir.children(dir).map { |f| File.join(dir, f) }.select { |p| File.file?(p) }
+      assert_equal [path], files
     end
   end
 end
