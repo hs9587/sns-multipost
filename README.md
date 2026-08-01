@@ -33,3 +33,4 @@
 
 設定は `config.sample.yml` を `config.yml` にコピーして記入する（`config.yml` はコミットされない）。
 設計は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md) を参照。
+トークン取得と常駐運用（タスクスケジューラ）の手順は [SETUP.md](SETUP.md) を参照。
