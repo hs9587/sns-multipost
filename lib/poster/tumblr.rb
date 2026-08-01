@@ -1,6 +1,8 @@
 # lib/poster/tumblr.rb
 require_relative "base"
 require_relative "../tumblr_api"
+require_relative "../tumblr_token"
+require_relative "../token_store"
 require_relative "../media"
 
 module SnsMultipost
@@ -29,9 +31,13 @@ module SnsMultipost
       end
 
       def api
-        @api ||= TumblrApi.new(
-          access_token: @config["tumblr"]["access_token"],
-          blog_identifier: @config["tumblr"]["blog_identifier"])
+        @api ||= begin
+          c = @config["tumblr"]
+          store = TokenStore.new(
+            File.expand_path("../../state/tumblr_token.json", __dir__))
+          token = TumblrToken.new(c, store: store).access_token
+          TumblrApi.new(access_token: token, blog_identifier: c["blog_identifier"])
+        end
       end
     end
 

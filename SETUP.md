@@ -16,9 +16,17 @@
 
 ## Tumblr のトークン
 
+Tumblr のアクセストークンは短命で、refresh token で更新する（Tumblr は更新のたびに
+refresh token も新しくなる＝ローテーション型なので、新しい refresh token は
+state/tumblr_token.json に自動保存される）。
+
 1. https://www.tumblr.com/oauth/apps でアプリを登録し OAuth2 consumer key/secret を取得
-2. OAuth2 の認可フローでアクセストークンを取得（scope: write）。取得したトークンを config.yml の `tumblr.access_token` に記入
-3. `tumblr.blog_identifier` に投稿先ブログ（例 you.tumblr.com）を記入
+2. OAuth2 の認可フローで refresh token を取得（scope: write, offline_access）
+3. config.yml の tumblr ブロックに記入:
+   - client_id = consumer key
+   - client_secret = secret key
+   - refresh_token = 取得した refresh token
+   - blog_identifier = 投稿先ブログ（例 you.tumblr.com）
 
 ## Blogger のトークン
 

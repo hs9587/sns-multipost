@@ -10,7 +10,9 @@ bluesky:
   app_password: ""               # 設定 > プライバシーとセキュリティ > アプリパスワード で発行
 
 tumblr:
-  access_token: ""               # Tumblr の OAuth2 アクセストークン
+  client_id: ""                  # Tumblr アプリの OAuth Consumer Key
+  client_secret: ""              # 同 Secret Key
+  refresh_token: ""              # OAuth2 認可で取得した refresh token（初回の種）
   blog_identifier: "you.tumblr.com"  # 投稿先ブログ（例 you.tumblr.com）
 
 blogger:
