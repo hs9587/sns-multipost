@@ -61,6 +61,17 @@ class TumblrTokenTest < Minitest::Test
     assert_equal "RT-new", store.data["refresh_token"]
   end
 
+  def test_refreshes_exactly_at_skew_boundary
+    # clock == expires_at - SKEW(60) ちょうどは「切れた」扱い（strict < なので refresh する）
+    store = MemStore.new(
+      "access_token" => "AT-old", "refresh_token" => "RT-stored", "expires_at" => 5000)
+    refr = FakeRefresher.new("access_token" => "AT-new", "refresh_token" => "RT-new",
+                             "expires_in" => 3600)
+    tok = SnsMultipost::TumblrToken.new(CFG, store: store, refresher: refr, clock: -> { 4940 })
+    assert_equal "AT-new", tok.access_token
+    refute_empty refr.calls # 境界ちょうどでも refresh する
+  end
+
   def test_keeps_refresh_token_when_response_omits_it
     store = MemStore.new({})
     refr = FakeRefresher.new("access_token" => "AT1", "expires_in" => 3600) # refresh_token 無し
