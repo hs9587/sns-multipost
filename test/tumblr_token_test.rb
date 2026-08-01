@@ -55,7 +55,7 @@ class TumblrTokenTest < Minitest::Test
     refr = FakeRefresher.new("access_token" => "AT-new", "refresh_token" => "RT-new",
                              "expires_in" => 3600)
     tok = SnsMultipost::TumblrToken.new(CFG, store: store, refresher: refr, clock: -> { 4999 })
-    # 4999 >= 5000 - 60 なので期限切れ扱い → refresh
+    # 期限しきい値は expires_at - SKEW = 4940。clock 4999 は 4940 を超えているので期限切れ扱い → refresh
     assert_equal "AT-new", tok.access_token
     assert_equal "RT-stored", refr.calls.first[:refresh_token] # config でなく store の RT
     assert_equal "RT-new", store.data["refresh_token"]

@@ -28,6 +28,10 @@ state/tumblr_token.json に自動保存される）。
    - refresh_token = 取得した refresh token
    - blog_identifier = 投稿先ブログ（例 you.tumblr.com）
 
+復旧: ローテーション型のため、`state/tumblr_token.json` を失う（削除・破損等）と
+最新の refresh token も失われる。その場合は手順2の OAuth2 認可フローをやり直して
+新しい refresh token を config.yml の `refresh_token` に入れ直す（初回の種として再シードされる）。
+
 ## Blogger のトークン
 
 1. Google Cloud Console でプロジェクトを作り、Blogger API v3 を有効化
