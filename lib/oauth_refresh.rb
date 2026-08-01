@@ -10,9 +10,9 @@ module SnsMultipost
       end
     end
 
-    # refresh token で access token を更新して返す
-    def self.access_token(token_uri:, client_id:, client_secret:, refresh_token:,
-                          transport: DEFAULT_TRANSPORT)
+    # refresh token でトークン一式を更新し、レスポンス JSON 全体を Hash で返す
+    def self.refresh(token_uri:, client_id:, client_secret:, refresh_token:,
+                     transport: DEFAULT_TRANSPORT)
       base = URI(token_uri)
       req = Net::HTTP::Post.new(base.request_uri)
       req.set_form_data(
@@ -25,9 +25,17 @@ module SnsMultipost
       unless code.between?(200, 299)
         raise "OAuth refresh error #{res.code}: #{res.body.to_s[0, 200]}"
       end
-      data = JSON.parse(res.body)
+      JSON.parse(res.body)
+    end
+
+    # refresh token で access token を更新して返す（Blogger 用の薄いラッパ）
+    def self.access_token(token_uri:, client_id:, client_secret:, refresh_token:,
+                          transport: DEFAULT_TRANSPORT)
+      data = refresh(token_uri: token_uri, client_id: client_id,
+                     client_secret: client_secret, refresh_token: refresh_token,
+                     transport: transport)
       data["access_token"] ||
-        raise("OAuth refresh: no access_token in response: #{res.body.to_s[0, 200]}")
+        raise("OAuth refresh: no access_token in response: #{data.inspect[0, 200]}")
     end
   end
 end
