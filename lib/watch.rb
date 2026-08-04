@@ -18,7 +18,10 @@ module SnsMultipost
       @media_fetcher = media_fetcher
     end
 
-    def run(now: Time.now)
+    # enqueue: false（基準合わせ / --sync-only）は、新着をキューに積まず
+    # since_id だけを最新へ前進させる。常駐 run_queue とのレースやメディアの
+    # 無駄ダウンロードを避けつつ「今の新着は流さず基準だけ今に合わせる」。
+    def run(now: Time.now, enqueue: true)
       since = File.exist?(@state_path) ? File.read(@state_path).strip : nil
       statuses = @api.statuses(
         account_id: @config["fedibird"]["account_id"], since_id: since)
@@ -27,13 +30,15 @@ module SnsMultipost
         record_state(statuses)
         return 0
       end
-      statuses.reverse_each do |st|
-        next if st["reblog"] || st["in_reply_to_id"]
-        next if @self_posted.include?(st["id"])
-        enqueue_status(st, now: now)
+      if enqueue
+        statuses.reverse_each do |st|
+          next if st["reblog"] || st["in_reply_to_id"]
+          next if @self_posted.include?(st["id"])
+          enqueue_status(st, now: now)
+        end
       end
       record_state(statuses)
-      statuses.size
+      enqueue ? statuses.size : 0
     end
 
     private

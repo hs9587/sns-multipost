@@ -62,6 +62,17 @@ class WatchTest < Minitest::Test
     end
   end
 
+  def test_sync_only_advances_state_without_enqueue
+    Dir.mktmpdir do |dir|
+      watch, queue = build_watch(dir)
+      File.write(File.join(dir, "since_id.txt"), "2")
+      # enqueue: false（基準合わせ）はキューを作らず since_id だけ前進させる
+      assert_equal 0, watch.run(enqueue: false)
+      assert_empty queue.pending
+      assert_equal "5", File.read(File.join(dir, "since_id.txt"))
+    end
+  end
+
   def test_threads_media_urls_into_jobs
     Dir.mktmpdir do |dir|
       statuses = [

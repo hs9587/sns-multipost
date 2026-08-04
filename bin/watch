@@ -7,6 +7,9 @@ require "self_posted"
 require "fedibird_api"
 require "watch"
 
+# --sync-only: 基準合わせ。キューを作らず since_id だけ最新へ前進させる。
+sync_only = ARGV.include?("--sync-only")
+
 config = SnsMultipost::Config.load
 watch = SnsMultipost::Watch.new(
   config: config,
@@ -18,5 +21,9 @@ watch = SnsMultipost::Watch.new(
   self_posted: SnsMultipost::SelfPosted.new,
   state_path: File.expand_path("../state/since_id.txt", __dir__),
   media_root: File.expand_path("../state/media", __dir__))
-count = watch.run
-puts "new statuses: #{count}"
+count = watch.run(enqueue: !sync_only)
+if sync_only
+  puts "sync-only: 基準を最新に合わせました（キューは作りません）"
+else
+  puts "new statuses: #{count}"
+end
