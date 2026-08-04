@@ -53,14 +53,14 @@ class PosterBlueskyTest < Minitest::Test
     Dir.mktmpdir do |dir|
       paths = (1..6).map do |i|
         p = File.join(dir, "#{i}.jpg")
-        File.binwrite(p, "x" * (i == 1 ? 2_000_000 : 100)) # 1枚目だけ超過
+        File.binwrite(p, "x" * (i == 1 ? 2_000_001 : 100)) # 1枚目だけ2MBを超過
         p
       end
       api = FakeApi.new
       poster = build(api: api)
       job = Job.new(sns: "bluesky", text: "写真", title: nil, media_paths: paths)
       poster.perform(job)
-      # 枚数上限 4 に切り詰め → うち1枚目(2MB)はサイズ超過で除外 → 3枚アップロード
+      # 枚数上限 4 に切り詰め → うち1枚目(2MB超)を除外 → 3枚アップロード
       assert_equal 3, api.uploaded.size
       assert_equal 3, api.posted[:blobs].size
     end

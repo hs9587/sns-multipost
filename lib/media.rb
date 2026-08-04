@@ -12,7 +12,7 @@ module SnsMultipost
     DEFAULT_LIMIT = 1
     # SNS 別の画像1枚あたりバイト上限。ここに無い SNS は無制限
     SIZE_LIMITS = {
-      "bluesky" => 1_000_000,
+      "bluesky" => 2_000_000,
       "x" => 5_000_000
     }.freeze
 

@@ -39,7 +39,7 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 （ジョブの `media_paths`）を使う。Blogger は元画像 URL（`media_urls`）を使う。
 `Media.for_sns` で SNS 別の枚数上限に切り詰める。
 
-- **Bluesky**: `com.atproto.repo.uploadBlob` で画像を上げ、`app.bsky.feed.post` レコードに embed（images）。テキスト上限 300 grapheme、画像4枚・約1MB/枚
+- **Bluesky**: `com.atproto.repo.uploadBlob` で画像を上げ、`app.bsky.feed.post` レコードに embed（images）。テキスト上限 300 grapheme、画像4枚・2MB/枚
 - **Tumblr**: `POST /v2/blog/{blog_identifier}/posts`（NPF: Neue Post Format）でテキストブロック＋画像ブロック。テキスト緩め、画像10枚
 - **Blogger**: Blogger API v3 に画像アップロード口がないため、Fedibird の元画像 URL を本文 HTML に `<img>` でホットリンクして `posts.insert`。**タイトル必須**なので title_rules の導出タイトルを使う（本文の改行は `<br>`/`<p>` へ）
 - **X**: OAuth1.0a 署名付き `POST /2/media/upload` で画像 → `POST /2/tweets` に `media.media_ids`。`media_category=tweet_image` 必須。テキスト上限 280、画像4枚・約5MB/枚
@@ -49,7 +49,7 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 ## 5. 共通の追加（lib）
 
 - **`lib/text_limit.rb`**: grapheme 単位で「上限-1字＋『…』」に切り詰め（Q4-a）。上限は SNS 別テーブル（x=280, bluesky=300, tumblr/blogger=なし）。絵文字で崩れないよう grapheme 単位
-- **`Media` にサイズ上限フィルタ追加**: SNS 別のバイト上限（bluesky≈1MB, x≈5MB, 他緩め）を超える画像を除外（Q5-a）。除外した旨をログに出す。投稿は残りで続行（依存追加なし・stdlib 維持）
+- **`Media` にサイズ上限フィルタ追加**: SNS 別のバイト上限（bluesky=2MB, x≈5MB, 他緩め）を超える画像を除外（Q5-a）。除外した旨をログに出す。投稿は残りで続行（依存追加なし・stdlib 維持）
 - **`lib/oauth_refresh.rb`**: refresh token 更新の共通HTTP処理。Blogger は access token 取得、Tumblr はローテーション応答全体の取得に使用
 - **`lib/token_store.rb` / `lib/tumblr_token.rb`**: Tumblr の access token とローテーション後の refresh token を原子的に永続化
 - **`lib/oauth1.rb`**: X 用 OAuth1.0a HMAC-SHA1 署名と Authorization ヘッダ生成
