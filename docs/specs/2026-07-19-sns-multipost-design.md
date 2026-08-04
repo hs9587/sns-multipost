@@ -1,7 +1,7 @@
 # sns-multipost 設計ドキュメント
 
 - 日付: 2026-07-19
-- 状態: ユーザー承認済み設計（brainstorming 完了）
+- 状態: ユーザー承認済み設計。Phase 1・2 実装完了、Phase 3 着手前（2026-08-04 現在）
 - リポジトリ: GitHub `hs9587/sns-multipost`（パブリック・新規作成）
 
 ## 1. 目的と背景
@@ -15,9 +15,9 @@
 
 | 項目 | 決定 |
 |------|------|
-| 実装言語 | 全 Ruby（ブラウザ部は playwright-ruby-client） |
+| 実装言語 | 全 Ruby。API 部は stdlib 中心、ブラウザ部はサービスごとのスパイクでドライバを選定 |
 | 実行形態 | 非常駐。ファイルキュー、タスクスケジューラ駆動 |
-| 投稿先 | X / Instagram(→Facebook・Threads 連携シェア) / mixi旧 / mixi2 / Bluesky / Blogger / Tumblr / Jotter.me |
+| 投稿先 | X / Instagram / mixi旧 / mixi2 / Bluesky / Blogger / Tumblr / Jotter.me。写真なし投稿向けに Facebook・Threads 直接投稿も追加予定 |
 | 入口 | Fedibird（きっかけ投稿自体が Fedibird 投稿を兼ねる） |
 | 投稿内容 | きっかけ投稿と同一（ハッシュタグ含め全文）。画像は先頭から各SNS上限まで（mixi=1枚） |
 | タイトル | 本文は全SNS同一。タイトル欄のあるSNSのみ辞書で導出（後述） |
@@ -51,7 +51,7 @@ sns-multipost/
     poster/               1 SNS = 1 ファイル（x.rb, instagram.rb, mixi.rb, mixi2.rb,
                           bluesky.rb, blogger.rb, tumblr.rb, jotter.rb, fedibird.rb）
     title_rules.rb        タイトル辞書エンジン
-    queue.rb              ジョブの生成・遷移（queue/ → done/ | failed/）
+    job_queue.rb          ジョブの生成・遷移（queue/ → done/ | failed/）
     media.rb              画像ダウンロード・SNS別枚数切り詰め
   title_rules.yml         タイトル辞書（育てる対象・コミットする）
   config.sample.yml       設定雛形（コミットする）
@@ -82,19 +82,19 @@ sns-multipost/
 | 組 | SNS | 手段 |
 |----|-----|------|
 | API組 | Bluesky / Tumblr / Blogger / Fedibird | 各 REST API（HTTP+JSON、gem は最小限） |
-| API組(条件付) | X | API v2 free tier。枠・規約で詰まったらブラウザ組へ降格 |
-| ブラウザ組 | Instagram / mixi旧 / mixi2 / Jotter.me | playwright-ruby-client。`state/profiles/` にログイン済みプロファイル永続化 |
+| API組(条件付) | X | API v2 + OAuth1.0a。コード・認証確認済み、ライブ投稿は API クレジット購入待ち |
+| ブラウザ組 | Instagram / mixi旧 / mixi2 / Jotter.me | 未実装。Playwright を第一候補としつつ、Jotter は Ferrum で操作特性を調査中 |
 
-- Instagram はハブ: アカウント連携設定で Facebook・Threads へ同時シェア（本ツールは Instagram にだけ投稿する）
+- Instagram は画像付き投稿のハブ候補。ただし写真なし投稿は Instagram に載らないため、Facebook・Threads への直接テキスト投稿を別途追加する
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
-- Jotter.me は **v1 テキスト投稿のみ**。画像投稿にはブラウザごとに DEN の用意が必要（DEN の残高は送金・振替機能で用意する）で、これは次ステップとしてスコープ外
+- Jotter.me は **v1 テキスト投稿のみ**。セーブポイント URL を毎回開き、同一ブラウザプロセス内で投稿する。画像投稿には DEN が必要なためスコープ外
 
 ### 要調査（実装フェーズ最初に小さく検証）
 
 1. mixi2 の Web からの投稿可否
-2. Jotter.me の投稿フォーム構造
+2. Jotter.me の安定したログイン完了判定と「メモを作成します」トリガのセレクタ
 3. Instagram の自動化検知の程度
-4. X API free tier の投稿枠が月間投稿数に足りるか
+4. X API は調査完了。現在は Pay Per Use のクレジット不足でライブ投稿を保留
 
 ## 8. タイトル辞書
 
@@ -103,7 +103,7 @@ sns-multipost/
 1. **おはよう**: 本文に「おはよう」→ タイトル「おはよう」
 2. **コーヒー**: コーヒー語彙（コーヒー、珈琲、ホット、アイス、アメリカン、ブレンド、ブリュー、モカ、キリマンジャロ、マンデリン等の産地・銘柄）、または非コーヒー飲料語（ティー、紅茶、ジュース等）が無く飲み物文脈（行きつけ店名リスト等）がある場合コーヒー扱い。タイトルは アイス系語彙→「アイス」、産地・銘柄→その名、他→「ホット」
 3. **食べ物リスト**: パン、ブレッド、スパゲティ、そば、ごはん、おにぎり等 → 最初にマッチした語
-4. **フォールバック**: 本文冒頭12字＋「…」
+4. **フォールバック**: 本文冒頭12字＋「…」。次の改修で、先頭12字以内の句読点では句読点の直前までを自然に切る
 
 辞書は「ドライラン＋指摘」で育てる: `bin/dryrun_titles` が Fedibird 公開 API で過去投稿200〜500件を取得し「投稿→タイトル」一覧表を出力。違和感のある行の指摘を受けて Claude が辞書に規則を追加する。X の過去分はアーカイブ zip の取り込み口を将来追加可能。
 
@@ -117,12 +117,12 @@ sns-multipost/
 ## 10. テスト
 
 - 単体テスト: タイトル辞書（最重要・回帰しやすい）、ジョブ生成・キュー遷移
-- 各ポスターに `dry_run` モード（投稿直前まで進めて止まる）。ブラウザ組はログイン〜投稿画面到達の smoke test
+- 各ポスターに `dry_run` モード（外部投稿を行わず疑似結果を返す）。処理済みジョブは `done/` へ移る。ブラウザ組はログイン〜投稿画面到達の smoke test
 - 本物投稿の確認は各SNS 1回ずつ手動キック
 
 ## 11. 秘匿情報の扱い
 
-- `config.yml`（APIキー・トークン・アカウント名・Jotter セーブポイント等）と `state/`（cookie・ブラウザプロファイル）は `.gitignore`
+- `config.yml`（APIキー・トークン・アカウント名等）と `state/`（token store・ブラウザプロファイル）は `.gitignore`。Jotter セーブポイント URL は環境変数などローカル限定の経路で渡す
 - `config.sample.yml` を雛形としてコミット。SETUP.md に「何をどこから取得してどの欄に書くか」を記載
 - **秘匿値はリポジトリ外**: config.sample.yml を雛形に、利用者本人が config.yml に直接記入する（アカウント名・ユーザーID程度は設計上必要になれば共有可）
 - **別マシンへの移行**: APIキー類は本人管理の経路（USB・パスワードマネージャ等、Git 経由にしない）で持ち込み移行先の config.yml に記入。ブラウザログイン状態は**移植せず移行先で別採取**（初回手動ログイン）。機体ごとに独立させ、cookie 移植はしない
@@ -130,7 +130,8 @@ sns-multipost/
 ## 12. 移設・運用
 
 - 開発: 在宅機 `sns-multipost`。本番: 稼働中の Windows 機（Claude Code 導入済み）
-- 移設手順（SETUP.md に記載): git clone → `bundle install` → playwright ブラウザ install → config.yml 記入 → ブラウザ組4サービスへ初回手動ログイン → schtasks でスケジューラ登録（bin/watch 5分おき、bin/run_queue その直後）
+- API 組の移設手順（SETUP.md に記載): git clone → `bundle install` → config.yml 記入 → `bin/watch --sync-only` → schtasks でスケジューラ登録（bin/watch の直後に bin/run_queue）
+- ブラウザ組は未実装。完成後、採用ドライバの導入と移設先での初回ログイン手順を追加する
 
 ## 13. スコープ外（次ステップ候補）
 
@@ -138,3 +139,13 @@ sns-multipost/
 - 出先対応のトリガ差し替え（Fedibird 監視の常駐化等）
 - タイトル判定の LLM ハイブリッド（c案）
 - note への投稿（対象外と決定済み）
+
+## 14. 実装状況と残課題（2026-08-04）
+
+- Phase 1: ファイルキュー、Fedibird 監視・投稿、タイトル辞書、再試行まで完了
+- Phase 2: Bluesky / Tumblr / Blogger / X を実装。X 以外はライブ投稿済み。X は認証通過後に 402 `credits depleted` を確認
+- Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
+- Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
+- Phase 3: Jotter の DOM と認証方式を調査中。Instagram / mixi / mixi2 は未着手
+- 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせできる
+- ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃
