@@ -10,7 +10,7 @@
 
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger は実投稿確認済み
-- X は OAuth1.0a 認証まで確認済み。ライブ投稿は API クレジット購入待ち
+- X は OAuth1.0a 認証まで確認済み。API課金は行わず、Phase 3でブラウザ投稿を実装する
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
@@ -26,7 +26,7 @@
 | Bluesky | 稼働 | AT Protocol。画像対応 |
 | Tumblr | 稼働 | OAuth2。トークン自動更新、画像対応 |
 | Blogger | 稼働 | Google OAuth2。画像は現在 Fedibird の画像 URL をホットリンク |
-| X | コード完成 | OAuth1.0a。ライブ投稿は API クレジット購入待ち |
+| X | APIコード完成・ブラウザ未実装 | APIは課金せず、Phase 3でログイン済みブラウザから投稿する |
 | Instagram | 未実装 | Phase 3 のブラウザ組。画像付き投稿のハブ候補 |
 | mixi / mixi2 | 未実装 | Phase 3 のブラウザ組。mixi2 は Web 投稿可否の調査が必要 |
 | Jotter.me | 調査中 | 初期版はテキストのみ。ブラウザ操作スパイクを進行中 |
@@ -59,7 +59,7 @@
 
 1. タイトルのフォールバックを、先頭範囲内の句読点で自然に切る
 2. Jotter のログイン完了判定と投稿画面への遷移を確定し、テキストポスターを実装
-3. Instagram / mixi / mixi2 のブラウザポスターを実装
+3. X / Instagram / mixi / mixi2 のブラウザポスターを実装
 4. Facebook / Threads の直接テキスト投稿を追加
 5. Blogger の画像を恒久的な画像ホストへ移行
 6. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加

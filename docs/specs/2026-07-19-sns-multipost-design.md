@@ -82,8 +82,8 @@ sns-multipost/
 | 組 | SNS | 手段 |
 |----|-----|------|
 | API組 | Bluesky / Tumblr / Blogger / Fedibird | 各 REST API（HTTP+JSON、gem は最小限） |
-| API組(条件付) | X | API v2 + OAuth1.0a。コード・認証確認済み、ライブ投稿は API クレジット購入待ち |
-| ブラウザ組 | Instagram / mixi旧 / mixi2 / Jotter.me | 未実装。Playwright を第一候補としつつ、Jotter は Ferrum で操作特性を調査中 |
+| API組(保管) | X | API v2 + OAuth1.0a のコードと認証確認結果は残すが、クレジット購入予定がないため実運用には使わない |
+| ブラウザ組 | X / Instagram / mixi旧 / mixi2 / Jotter.me | 未実装。Playwright を第一候補としつつ、Jotter は Ferrum で操作特性を調査中 |
 
 - Instagram は画像付き投稿のハブ候補。ただし写真なし投稿は Instagram に載らないため、Facebook・Threads への直接テキスト投稿を別途追加する
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
@@ -93,8 +93,8 @@ sns-multipost/
 
 1. mixi2 の Web からの投稿可否
 2. Jotter.me の安定したログイン完了判定と「メモを作成します」トリガのセレクタ
-3. Instagram の自動化検知の程度
-4. X API は調査完了。現在は Pay Per Use のクレジット不足でライブ投稿を保留
+3. Instagram と X のブラウザ自動化検知・投稿画面の安定性
+4. X API は調査完了。Pay Per Use のクレジットは購入せず、ブラウザ投稿へ切り替える
 
 ## 8. タイトル辞書
 
@@ -143,9 +143,9 @@ sns-multipost/
 ## 14. 実装状況と残課題（2026-08-04）
 
 - Phase 1: ファイルキュー、Fedibird 監視・投稿、タイトル辞書、再試行まで完了
-- Phase 2: Bluesky / Tumblr / Blogger / X を実装。X 以外はライブ投稿済み。X は認証通過後に 402 `credits depleted` を確認
+- Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認し、実運用はブラウザ投稿へ切替決定
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
 - Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
-- Phase 3: Jotter の DOM と認証方式を調査中。Instagram / mixi / mixi2 は未着手
+- Phase 3: Jotter の DOM と認証方式を調査中。X / Instagram / mixi / mixi2 のブラウザ投稿は未着手
 - 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせできる
 - ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃

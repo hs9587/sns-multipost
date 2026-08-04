@@ -1,7 +1,7 @@
 # sns-multipost Phase 2 設計ドキュメント（API組ポスター）
 
 - 日付: 2026-07-20
-- 状態: 実装完了・実投稿確認済み（X のライブ投稿のみ API クレジット待ち）
+- 状態: 実装完了・実投稿確認済み。X API は認証確認のみで終了し、実運用は Phase 3 のブラウザ投稿へ切替
 - 前提: Phase 1 完了（`Poster::Base` パターン・ファイルキュー・injected transport・config.yml 確立済み）
 - リポジトリ: GitHub `hs9587/sns-multipost`（既存 main に追加）
 
@@ -65,13 +65,13 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 
 - 対話型 OAuth の内蔵（Q2-b。初回トークン取得は外部）
 - 画像の縮小・再圧縮（Q5-b。超過画像は落とすだけ）
-- ブラウザ組（Instagram / mixi / mixi2 / Jotter）は Phase 3
-- X のクレジット購入または別経路への切替判断
+- ブラウザ組（X / Instagram / mixi / mixi2 / Jotter）は Phase 3
+- X API の課金判断（2026-08-04に「購入せずブラウザ投稿へ切替」で確定）
 - 本文が長い時の「リンク付き続き」方式（Q4-b。まず単純切り詰め）
 
 ## 8. リスク・留意
 
-- **X の課金**: 現在のアカウントは Pay Per Use で、クレジット残高がないためライブ投稿を保留。OAuth1.0a 認証自体は確認済み
+- **X の課金**: Pay Per Use のクレジットは購入しない。OAuth1.0a実装は保管し、実運用はPhase 3のブラウザ投稿とする
 - **Tumblr の token rotation**: 最新 refresh token は `state/tumblr_token.json` にしかない場合がある。失った場合はOAuth認可をやり直す
 - **Blogger の画像**: 現在は Fedibird 画像のホットリンク。元画像を削除すると Blogger 側も切れるため、恒久的な画像ホストへの移行が課題
 
@@ -80,5 +80,5 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 - Phase 2a Bluesky: 実装・画像付き実投稿完了
 - Phase 2b Tumblr: NPF multipart のバイナリ安全化、レスポンス形式修正、トークン自動更新まで完了
 - Phase 2c Blogger: OAuth refresh、HTML本文、画像ホットリンク、実投稿完了
-- Phase 2d X: OAuth1.0a、v2メディアアップロード、ツイート生成まで完成。認証通過、クレジット待ち
+- Phase 2d X: OAuth1.0a、v2メディアアップロード、ツイート生成まで完成し認証通過。API課金は行わず、ブラウザ投稿へ切替
 - Fedibird の写真付き投稿から Blogger / Bluesky への一気通貫を実画像で確認済み
