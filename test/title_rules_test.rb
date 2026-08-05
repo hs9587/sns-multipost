@@ -22,6 +22,16 @@ class TitleRulesTest < Minitest::Test
     assert_equal "アイス", @rules.title_for("アイスコーヒーで一息")
   end
 
+  def test_blend_is_hot_without_iced_word
+    assert_equal "ホット", @rules.title_for("ブレンドコーヒーを一杯")
+  end
+
+  def test_blend_is_iced_with_iced_word
+    %w[アイス コール コールド レイ].each do |iced|
+      assert_equal "アイス", @rules.title_for("#{iced}ブレンド")
+    end
+  end
+
   def test_coffee_brand_name
     assert_equal "モカ", @rules.title_for("猫廼舎。イエメン イブラヒム・モカ、特徴が強い")
   end
@@ -60,6 +70,8 @@ class TitleRulesTest < Minitest::Test
                  @rules.title_for("オニオンベーコン、サトイモインゲン味噌汁、オムハムサンド。")
     assert_equal "デニッシュ",
                  @rules.title_for("オニオンサラダ、鮭、目玉焼き、アップルデニッシュ。")
+    assert_equal "ライス",
+                 @rules.title_for("ハッシュドビーフライス、ハムコールスローサラダ。")
   end
 
   def test_coffee_still_wins_over_staple_food
