@@ -7,9 +7,7 @@ module SnsMultipost
     def parser(banner:, description:, examples: [], notes: [])
       OptionParser.new do |opts|
         opts.banner = banner
-        opts.separator ""
         opts.separator description
-        opts.separator ""
         opts.separator "Options:"
         yield opts if block_given?
         opts.on("-h", "--help", "このヘルプを表示") do
@@ -17,12 +15,10 @@ module SnsMultipost
           exit 0
         end
         unless examples.empty?
-          opts.separator ""
           opts.separator "Examples:"
           examples.each { |example| opts.separator "  #{example}" }
         end
         unless notes.empty?
-          opts.separator ""
           opts.separator "Notes:"
           notes.each { |note| opts.separator "  #{note}" }
         end

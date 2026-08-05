@@ -8,9 +8,10 @@ require "poster/all"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/retry [options] FILE...",
-  description: "failed/ の失敗ジョブをキューへ戻して再実行します。",
+  description: "sns-multipostで失敗したfailed/のジョブをqueue/へ戻し、そのジョブだけ再実行します。\n通常はbin/run_queueの結果がfailedになった後、原因を直してから使用します。",
   examples: ["ruby bin/retry failed/20260805-120000_bluesky_ab12.json"],
-  notes: ["dry_run: false の場合は実投稿します。複数ファイルを指定できます。"])
+  notes: ["dry_run: false の場合は実投稿します。",
+          "複数の失敗ジョブをまとめて指定できます。"])
 SnsMultipost::Cli.parse!(parser)
 if ARGV.empty?
   SnsMultipost::Cli.usage_error(parser, "失敗ジョブのJSONファイルを指定してください")

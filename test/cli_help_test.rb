@@ -34,6 +34,26 @@ class CliHelpTest < Minitest::Test
     assert status.success?
     assert_includes stdout, "--sync-only"
     assert_includes stdout, "キューを作らず監視基準だけ最新へ進める"
+    assert_includes stdout, "この後に ruby bin/run_queue"
+  end
+
+  def test_run_queue_help_explains_watch_precondition
+    stdout, _stderr, status = run_cli("run_queue", "--help")
+    assert status.success?
+    assert_includes stdout, "先に ruby bin/watch"
+  end
+
+  def test_dryrun_titles_help_explains_dictionary_check_without_posting
+    stdout, _stderr, status = run_cli("dryrun_titles", "--help")
+    assert status.success?
+    assert_includes stdout, "title_rules.yml"
+    assert_includes stdout, "各SNSへの投稿は行いません"
+  end
+
+  def test_help_is_compact_without_blank_lines_between_sections
+    stdout, _stderr, status = run_cli("watch", "--help")
+    assert status.success?
+    refute_includes stdout, "\n\n"
   end
 
   def test_post_requires_text

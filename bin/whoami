@@ -6,7 +6,8 @@ require "fedibird_api"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/whoami [options]",
-  description: "Fedibird APIで自分のaccount_idとアカウント名を確認します。")
+  description: "sns-multipostの初期設定用に、Fedibird APIで自分のaccount_idとアカウント名を確認します。\n確認したaccount_idはconfig.ymlのfedibird設定へ記入します。",
+  notes: ["投稿ジョブの作成や各SNSへの投稿は行いません。"])
 SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
 

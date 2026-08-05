@@ -9,9 +9,10 @@ require "title_rules"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/dryrun_titles [options] [COUNT]",
-  description: "Fedibirdの過去投稿へタイトル辞書を適用し、TSVへ保存します。",
+  description: "sns-multipostのタイトル辞書（title_rules.yml）を確認するためのコマンドです。\nFedibirdの過去投稿へ辞書を試し、導出タイトルと本文の一覧をTSVへ保存します。",
   examples: ["ruby bin/dryrun_titles", "ruby bin/dryrun_titles 500"],
-  notes: ["COUNTの省略時は200件です。"])
+  notes: ["投稿ジョブの作成や各SNSへの投稿は行いません。",
+          "COUNTの省略時は200件です。出力先はlogs/dryrun_titles_*.tsvです。"])
 if ARGV.first&.match?(/\A-\d+\z/)
   SnsMultipost::Cli.usage_error(parser, "COUNTは1以上の整数で指定してください")
 end

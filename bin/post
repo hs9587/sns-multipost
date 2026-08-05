@@ -8,9 +8,11 @@ require "title_rules"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/post [options] TEXT...",
-  description: "本文から、設定された全投稿先のジョブを作成します。",
+  description: "sns-multipostへ本文を手動投入し、設定された全投稿先のジョブをqueue/に作成します。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
   examples: ['ruby bin/post "おはようございます"',
-             'ruby bin/post -- "-から始まる本文"'])
+             'ruby bin/post -- "-から始まる本文"'],
+  notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
+          "Fedibird監視を経由しない、写真なしの手動投稿に使います。"])
 SnsMultipost::Cli.parse!(parser)
 text = ARGV.join(" ").strip
 SnsMultipost::Cli.usage_error(parser, "本文を指定してください") if text.empty?

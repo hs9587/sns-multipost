@@ -8,8 +8,9 @@ require "poster/all"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/run_queue [options]",
-  description: "queue/ の全ジョブを順番に処理します。",
-  notes: ["dry_run: false の場合は実投稿します。",
+  description: "sns-multipostのqueue/にあるジョブを処理し、各SNSへ投稿します。\n通常は先に ruby bin/watch を実行し、Fedibirdの新着からジョブを作成します。",
+  notes: ["bin/postで手動作成したジョブも処理します。",
+          "dry_run: false の場合は実投稿します。",
           "dry_run: true でも処理したジョブは done/ へ移動します。"])
 SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
