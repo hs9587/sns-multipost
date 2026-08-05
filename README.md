@@ -6,7 +6,7 @@
 旧 [SNS_multi_post](https://github.com/hs9587/SNS_multi_post)（Ruby+Selenium 世代）の後継として、
 「トリガ → ファイルキュー → 投稿実行」を分離した構成で作り直している。
 
-## 現在の状態（2026-08-04）
+## 現在の状態（2026-08-05）
 
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger は実投稿確認済み
@@ -14,7 +14,8 @@
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
-- 次の実装対象はタイトル導出の句読点対応、その後 Jotter のテキスト投稿
+- タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
+- 次の実装対象は Jotter のテキスト投稿
 
 テストは `bundle exec rake test` で実行する。
 
@@ -63,12 +64,11 @@
 
 ## ロードマップ
 
-1. タイトルのフォールバックを、先頭範囲内の句読点で自然に切る
-2. Jotter のログイン完了判定と投稿画面への遷移を確定し、テキストポスターを実装
-3. X / Instagram / mixi / mixi2 のブラウザポスターを実装
-4. Facebook / Threads の直接テキスト投稿を追加
-5. Blogger の画像を恒久的な画像ホストへ移行
-6. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
+1. Jotter のログイン完了判定と投稿画面への遷移を確定し、テキストポスターを実装
+2. X / Instagram / mixi / mixi2 のブラウザポスターを実装
+3. Facebook / Threads の直接テキスト投稿を追加
+4. Blogger の画像を恒久的な画像ホストへ移行
+5. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
 
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
 Phase 2 の実装結果は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、

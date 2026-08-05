@@ -46,9 +46,13 @@ module SnsMultipost
     end
 
     def fallback(text)
-      flat = text.gsub(/\s+/, " ").strip
+      flat = text.strip
       len = @r["fallback_length"] || 12
-      flat.length <= len ? flat : flat[0, len] + "…"
+      head = flat[0, len]
+      boundary = head.index(/[、。，．,.！？!?\s　]/)
+      return head[0, boundary] if boundary&.positive?
+
+      flat.length <= len ? flat : head + "…"
     end
   end
 end

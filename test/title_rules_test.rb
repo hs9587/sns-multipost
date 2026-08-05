@@ -48,7 +48,7 @@ class TitleRulesTest < Minitest::Test
   def test_iced_tea_is_not_coffee
     # アイス/ホットの語だけでは非コーヒー飲料をコーヒー扱いしない
     assert_equal "アイスティーで休憩", @rules.title_for("アイスティーで休憩")
-    assert_equal "和栗のモンブラン、アイス…",
+    assert_equal "和栗のモンブラン",
                  @rules.title_for("和栗のモンブラン、アイスルイボスティー。")
   end
 
@@ -81,6 +81,21 @@ class TitleRulesTest < Minitest::Test
 
   def test_fallback_truncates_to_12_chars
     assert_equal "今日は良い天気なので散歩…", @rules.title_for("今日は良い天気なので散歩に出かけました")
+  end
+
+  def test_fallback_stops_before_punctuation_within_12_chars
+    assert_equal "季節のケーキ", @rules.title_for("季節のケーキ、飲み物もいただきました")
+    assert_equal "季節のケーキ", @rules.title_for("季節のケーキ。飲み物もいただきました")
+  end
+
+  def test_fallback_stops_before_whitespace_within_12_chars
+    assert_equal "季節のケーキ", @rules.title_for("季節のケーキ 飲み物もいただきました")
+    assert_equal "季節のケーキ", @rules.title_for("季節のケーキ\n飲み物もいただきました")
+    assert_equal "季節のケーキ", @rules.title_for("季節のケーキ　飲み物もいただきました")
+  end
+
+  def test_fallback_ignores_boundary_after_first_12_chars
+    assert_equal "今日は良い天気なので散歩…", @rules.title_for("今日は良い天気なので散歩、休憩しました")
   end
 
   def test_fallback_short_text_as_is
