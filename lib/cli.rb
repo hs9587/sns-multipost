@@ -7,7 +7,9 @@ module SnsMultipost
     def parser(banner:, description:, examples: [], notes: [])
       OptionParser.new do |opts|
         opts.banner = banner
-        opts.separator description
+        description.lines(chomp: true).each do |line|
+          opts.separator "  #{line}"
+        end
         opts.separator "Options:"
         yield opts if block_given?
         opts.on("-h", "--help", "このヘルプを表示") do

@@ -56,6 +56,17 @@ class CliHelpTest < Minitest::Test
     refute_includes stdout, "\n\n"
   end
 
+  def test_description_lines_use_the_same_two_space_indent_as_examples_and_notes
+    stdout, _stderr, status = run_cli("watch", "--help")
+    assert status.success?
+    assert_includes stdout,
+                    "\n  sns-multipostの入口としてFedibirdの新着を検出し、queue/に投稿ジョブを作成します。\n"
+    assert_includes stdout,
+                    "\n  通常はこの後に ruby bin/run_queue を実行して、各SNSへ投稿します。\n"
+    assert_includes stdout, "\n  ruby bin/watch\n"
+    assert_includes stdout, "\n  このコマンドだけでは各SNSへの投稿は実行しません。\n"
+  end
+
   def test_post_requires_text
     _stdout, stderr, status = run_cli("post")
     assert_equal 2, status.exitstatus
