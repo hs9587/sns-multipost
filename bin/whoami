@@ -1,7 +1,14 @@
 #!/usr/bin/env ruby
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
 require "config"
 require "fedibird_api"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/whoami [options]",
+  description: "Fedibird APIで自分のaccount_idとアカウント名を確認します。")
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
 
 config = SnsMultipost::Config.load
 me = SnsMultipost::FedibirdApi.new(

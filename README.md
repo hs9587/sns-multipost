@@ -52,6 +52,12 @@
     ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
     ruby bin/whoami               # Fedibird の account_id 確認
 
+全コマンドで `-h` / `--help` を利用できる。オプション、引数、実投稿に関する注意は
+各コマンドのヘルプで確認する。
+
+    ruby bin/watch --help
+    ruby bin/run_queue --help
+
 設定構造は `config.sample.yml` を参照し、実際の秘密値は Git 管理外の `config.yml` に利用者本人が記入する。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
