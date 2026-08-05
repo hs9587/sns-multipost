@@ -15,8 +15,8 @@ coffee:
   non_coffee_drinks: [ティー, 紅茶, ルイボス, ジュース, ココア, 抹茶, ビール, ワイン]
   shops: [猫廼舎]
 
-# パン・ブレッドは主菜より優先。まず foods_priority を見て、無ければ foods
-foods_priority: [パン, ブレッド]
+# 主食語は主菜より優先。まず foods_priority を見て、無ければ foods
+foods_priority: [パン, ブレッド, サンド, デニッシュ]
 foods: [スパゲティ, そば, うどん, ラーメン, カレー, ごはん, おにぎり]
 
 fallback_length: 12

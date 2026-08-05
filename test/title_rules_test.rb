@@ -53,9 +53,18 @@ class TitleRulesTest < Minitest::Test
   end
 
   def test_bread_priority_over_other_food
-    # パン・ブレッドは主菜や他の食べ物語より優先
+    # 主食語は主菜や他の食べ物語より優先
     assert_equal "パン", @rules.title_for("カレーの後にくるみパン")
     assert_equal "ブレッド", @rules.title_for("煮込みハンバーグ、バナナブレッド")
+    assert_equal "サンド",
+                 @rules.title_for("オニオンベーコン、サトイモインゲン味噌汁、オムハムサンド。")
+    assert_equal "デニッシュ",
+                 @rules.title_for("オニオンサラダ、鮭、目玉焼き、アップルデニッシュ。")
+  end
+
+  def test_coffee_still_wins_over_staple_food
+    assert_equal "アイス",
+                 @rules.title_for("クッキーデニッシュ シトラス&チーズ、アイス デカフェコーヒー。")
   end
 
   def test_fallback_truncates_to_12_chars
