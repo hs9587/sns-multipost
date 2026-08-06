@@ -2,8 +2,27 @@ require_relative "test_helper"
 require "config"
 
 class ConfigTest < Minitest::Test
-  def test_targets_for_watch_excludes_fedibird
+  def test_targets_for_uses_separate_watch_and_post_lists
+    c = SnsMultipost::Config.new(
+      { "targets" => {
+        "watch" => %w[bluesky tumblr blogger],
+        "post" => %w[fedibird bluesky tumblr blogger]
+      } }
+    )
+
+    assert_equal %w[bluesky tumblr blogger], c.targets_for(:watch)
+    assert_equal %w[fedibird bluesky tumblr blogger], c.targets_for(:post)
+  end
+
+  def test_targets_for_missing_list_is_empty
+    c = SnsMultipost::Config.new({ "targets" => { "watch" => ["bluesky"] } })
+
+    assert_equal [], c.targets_for(:post)
+  end
+
+  def test_legacy_targets_array_remains_compatible
     c = SnsMultipost::Config.new({ "targets" => ["fedibird", "x"] })
+
     assert_equal ["x"], c.targets_for(:watch)
     assert_equal ["fedibird", "x"], c.targets_for(:post)
   end
@@ -20,8 +39,11 @@ class ConfigTest < Minitest::Test
   def test_load_reads_yaml
     Dir.mktmpdir do |dir|
       path = File.join(dir, "config.yml")
-      File.write(path, "targets:\n  - fedibird\n")
-      assert_equal ["fedibird"], SnsMultipost::Config.load(path).targets_for(:post)
+      File.write(path, "targets:\n  watch:\n    - bluesky\n  post:\n    - fedibird\n")
+      config = SnsMultipost::Config.load(path)
+
+      assert_equal ["bluesky"], config.targets_for(:watch)
+      assert_equal ["fedibird"], config.targets_for(:post)
     end
   end
 end

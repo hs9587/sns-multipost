@@ -60,6 +60,8 @@
     ruby bin/run_queue --help
 
 設定構造は `config.sample.yml` を参照し、実際の秘密値は Git 管理外の `config.yml` に利用者本人が記入する。
+投稿先は `targets.watch`（Fedibird新着からの展開）と `targets.post`（`bin/post` の手動投入）へ
+別々に列挙するため、入口ごとに投稿先を選べる。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ

@@ -22,13 +22,14 @@ class WatchTest < Minitest::Test
       "url" => "u3", "media_attachments" => [] },
   ].freeze
 
-  def build_watch(dir, statuses: STATUSES, targets: %w[fedibird x bluesky])
+  def build_watch(dir, statuses: STATUSES, targets: %w[x bluesky])
     sp = SnsMultipost::SelfPosted.new(File.join(dir, "sp.txt"))
     sp.record("4")
     queue = SnsMultipost::JobQueue.new(dir)
     watch = SnsMultipost::Watch.new(
       config: SnsMultipost::Config.new(
-        { "targets" => targets, "fedibird" => { "account_id" => "42" } }),
+        { "targets" => { "watch" => targets },
+          "fedibird" => { "account_id" => "42" } }),
       api: FakeApi.new(statuses),
       queue: queue,
       titles: SnsMultipost::TitleRules.load,

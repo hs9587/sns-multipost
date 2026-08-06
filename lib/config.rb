@@ -20,8 +20,11 @@ module SnsMultipost
     end
 
     def targets_for(trigger)
-      all = @hash["targets"] || []
-      trigger == :watch ? all - ["fedibird"] : all
+      targets = @hash["targets"] || []
+      return targets[trigger.to_s] || [] if targets.is_a?(Hash)
+
+      # 旧形式との互換性: 配列の場合、watch だけ Fedibird を除外する。
+      trigger == :watch ? targets - ["fedibird"] : targets
     end
   end
 end

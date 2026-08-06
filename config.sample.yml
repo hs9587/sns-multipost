@@ -28,13 +28,20 @@ x:
   access_token_secret: ""        # 同シークレット
   username: "you"                # URL 組立用（@ 抜きのユーザー名）
 
-# 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる
+# 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる。
+# watch は Fedibird の新着から、post は bin/post の本文から作るジョブの投稿先。
 targets:
-  - fedibird
-  - bluesky
-  - tumblr
-  - blogger
-  - x
+  watch:
+    - bluesky
+    - tumblr
+    - blogger
+    - x
+  post:
+    - fedibird
+    - bluesky
+    - tumblr
+    - blogger
+    - x
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true
