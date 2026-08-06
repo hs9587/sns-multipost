@@ -28,6 +28,14 @@ x:
   access_token_secret: ""        # 同シークレット
   username: "you"                # URL 組立用（@ 抜きのユーザー名）
 
+threads:
+  app_id: ""                     # MetaアプリのThreads App ID
+  app_secret: ""                 # 同Threads App Secret
+  redirect_uri: "https://localhost/threads/callback"  # Meta側にも同じURLを登録
+  # 通常は bin/threads_auth で state/threads_token.json に長期トークンを保存する。
+  # 手動取得したトークンを直接使う場合だけ access_token を記入する。
+  access_token: ""
+
 # 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる。
 # watch は Fedibird の新着から、post は bin/post の本文から作るジョブの投稿先。
 targets:
@@ -42,6 +50,7 @@ targets:
     - tumblr
     - blogger
     - x
+    - threads
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true

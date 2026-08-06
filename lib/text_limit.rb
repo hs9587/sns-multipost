@@ -3,7 +3,8 @@ module SnsMultipost
     # SNS 別の本文文字数上限（grapheme 単位）。ここに無い SNS は無制限
     LIMITS = {
       "x" => 280,
-      "bluesky" => 300
+      "bluesky" => 300,
+      "threads" => 500
     }.freeze
 
     ELLIPSIS = "…".freeze

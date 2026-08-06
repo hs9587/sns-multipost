@@ -1,0 +1,76 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "securerandom"
+require "time"
+require "uri"
+require "cli"
+require "config"
+require "threads_oauth"
+require "threads_token"
+require "token_store"
+
+mode = nil
+callback_url = nil
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/threads_auth [options]",
+  description: "sns-multipostのThreads API用OAuth認証を行います。\n最初に--authorizeで認可URLを出し、認可後の戻り先URLを--callbackへ渡します。",
+  examples: ["ruby bin/threads_auth --authorize",
+             'ruby bin/threads_auth --callback "https://localhost/threads/callback?code=...&state=..."'],
+  notes: ["長期アクセストークンはstate/threads_token.jsonへ保存します。",
+          "このコマンド自体はThreadsへ投稿しません。"]) do |opts|
+  opts.on("--authorize", "Threadsの認可URLを表示") { mode = :authorize }
+  opts.on("--callback URL", "認可後に移動した戻り先URL") do |url|
+    mode = :callback
+    callback_url = url
+  end
+end
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+SnsMultipost::Cli.usage_error(parser, "--authorize または --callback を指定してください") unless mode
+
+config = SnsMultipost::Config.load
+threads = config["threads"] || {}
+required = lambda do |key|
+  value = threads[key].to_s
+  raise "config.yml の threads.#{key} を設定してください" if value.empty?
+  value
+end
+
+state_root = File.expand_path("../state", __dir__)
+oauth_state = SnsMultipost::TokenStore.new(File.join(state_root, "threads_oauth_state.json"))
+token_store = SnsMultipost::TokenStore.new(File.join(state_root, "threads_token.json"))
+
+if mode == :authorize
+  state = SecureRandom.hex(24)
+  oauth_state.save("state" => state, "created_at" => Time.now.utc.iso8601)
+  puts SnsMultipost::ThreadsOAuth.authorization_url(
+    client_id: required.call("app_id"),
+    redirect_uri: required.call("redirect_uri"),
+    state: state)
+  exit 0
+end
+
+uri = URI(callback_url)
+params = URI.decode_www_form(uri.query.to_s).to_h
+expected_state = oauth_state.load["state"].to_s
+raise "Threads OAuth state が一致しません。--authorize からやり直してください" if
+  expected_state.empty? || params["state"].to_s != expected_state
+code = params["code"].to_s
+raise "戻り先URLにThreads認可コードがありません" if code.empty?
+
+short = SnsMultipost::ThreadsOAuth.exchange_code(
+  client_id: required.call("app_id"),
+  client_secret: required.call("app_secret"),
+  redirect_uri: required.call("redirect_uri"),
+  code: code)
+long = SnsMultipost::ThreadsOAuth.exchange_long_lived(
+  client_secret: required.call("app_secret"),
+  access_token: short.fetch("access_token"))
+now = Time.now.to_i
+token_store.save(
+  "access_token" => long.fetch("access_token"),
+  "user_id" => short["user_id"],
+  "expires_at" => now +
+    (long["expires_in"] || SnsMultipost::ThreadsToken::DEFAULT_EXPIRES_IN).to_i)
+oauth_state.save("used_at" => Time.now.utc.iso8601)
+puts "Threadsの長期アクセストークンを保存しました"

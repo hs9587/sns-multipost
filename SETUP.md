@@ -55,6 +55,33 @@ X はメディアアップロードが OAuth1.0a 必須のため、投稿も OAu
 5. 現在のアカウントは Pay Per Use 契約で、クレジットがない場合は 402
    `credits depleted` になる。認証確認は完了しているが、ライブ投稿にはクレジット購入が必要
 
+## Threads のトークン
+
+Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_basic` と
+`threads_content_publish`。長期アクセストークンは約60日で、期限の7日前から
+`state/threads_token.json` へ自動更新・保存する。
+
+1. Meta for Developers でアプリを作成し、Threads のユースケースを追加する
+2. Threads API設定の OAuth Redirect URI に、例として
+   `https://localhost/threads/callback` を登録する
+3. `config.yml` の `threads` ブロックへ `app_id`、`app_secret`、登録した
+   `redirect_uri` を記入する
+4. 認可URLを表示する:
+
+       ruby bin/threads_auth --authorize
+
+5. 表示されたURLをブラウザで開いて認可する。localhostへの移動に失敗しても、
+   アドレスバーに `code` と `state` を含む戻り先URLが表示されればよい
+6. アドレスバーの戻り先URL全体を渡す:
+
+       ruby bin/threads_auth --callback "https://localhost/threads/callback?code=...&state=..."
+
+7. `Threadsの長期アクセストークンを保存しました` と表示されたら、
+   `targets.post` に `threads` を追加する
+
+認証情報と長期トークンは表示・Git管理しない。認可をやり直す場合も
+`--authorize` から開始し、新しい `state` を使う。
+
 ## 常駐運用（Windows タスクスケジューラ）
 
 Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常駐プロセスは持たず、

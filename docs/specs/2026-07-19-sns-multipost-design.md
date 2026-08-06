@@ -81,11 +81,11 @@ sns-multipost/
 
 | 組 | SNS | 手段 |
 |----|-----|------|
-| API組 | Bluesky / Tumblr / Blogger / Fedibird | 各 REST API（HTTP+JSON、gem は最小限） |
+| API組 | Bluesky / Tumblr / Blogger / Fedibird / Threads | 各 REST API（HTTP+JSON、gem は最小限）。Threads は `bin/post` のテキストのみ |
 | API組(保管) | X | API v2 + OAuth1.0a のコードと認証確認結果は残すが、クレジット購入予定がないため実運用には使わない |
 | ブラウザ組 | X / Instagram / mixi旧 / mixi2 / Jotter.me | 未実装。Playwright を第一候補としつつ、Jotter は Ferrum で操作特性を調査中 |
 
-- Instagram は画像付き投稿のハブ候補。ただし写真なし投稿は Instagram に載らないため、Facebook・Threads への直接テキスト投稿を別途追加する
+- Instagram は画像付き投稿のハブ候補。写真なし投稿は Threads API へ直接投稿し、Facebook 個人プロフィールはブラウザ投稿で追加する
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
 - Jotter.me は **v1 テキスト投稿のみ**。セーブポイント URL を毎回開き、同一ブラウザプロセス内で投稿する。画像投稿には DEN が必要なためスコープ外
 

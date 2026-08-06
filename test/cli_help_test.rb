@@ -4,7 +4,7 @@ require "rbconfig"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[dryrun_titles post retry run_queue watch whoami].freeze
+  COMMANDS = %w[dryrun_titles post retry run_queue threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -48,6 +48,15 @@ class CliHelpTest < Minitest::Test
     assert status.success?
     assert_includes stdout, "title_rules.yml"
     assert_includes stdout, "各SNSへの投稿は行いません"
+  end
+
+  def test_threads_auth_help_explains_two_step_authentication
+    stdout, _stderr, status = run_cli("threads_auth", "--help")
+    assert status.success?
+    assert_includes stdout, "--authorize"
+    assert_includes stdout, "--callback"
+    assert_includes stdout, "state/threads_token.json"
+    assert_includes stdout, "Threadsへ投稿しません"
   end
 
   def test_help_is_compact_without_blank_lines_between_sections

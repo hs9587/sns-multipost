@@ -25,6 +25,13 @@ class TextLimitTest < Minitest::Test
     assert got.end_with?("…")
   end
 
+  def test_threads_limit_is_500
+    text = "あ" * 600
+    got = SnsMultipost::TextLimit.fit(text, "threads")
+    assert_equal 500, got.grapheme_clusters.length
+    assert got.end_with?("…")
+  end
+
   def test_counts_by_grapheme_not_codepoint
     # 家族絵文字は複数コードポイントで1書記素。上限ちょうどなら切らない
     fam = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}" # 1 grapheme
