@@ -38,6 +38,11 @@ module SnsMultipost
       usage_error(parser, "余分な引数があります: #{argv.join(' ')}")
     end
 
+    def text_or_default(argv = ARGV, default:)
+      text = argv.join(" ").strip
+      text.empty? ? default : text
+    end
+
     def usage_error(parser, message)
       warn message
       warn

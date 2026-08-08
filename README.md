@@ -47,7 +47,8 @@
 
 ## 使い方
 
-    ruby bin/post "本文"          # 手動投稿（対象 SNS のキューを生成）
+    ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
+    ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
     ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める

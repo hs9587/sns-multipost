@@ -7,15 +7,15 @@ require "job_queue"
 require "title_rules"
 
 parser = SnsMultipost::Cli.parser(
-  banner: "Usage: ruby bin/post [options] TEXT...",
-  description: "sns-multipostへ本文を手動投入し、設定された全投稿先のジョブをqueue/に作成します。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
-  examples: ['ruby bin/post "おはようございます"',
+  banner: "Usage: ruby bin/post [options] [TEXT...]",
+  description: "sns-multipostへ本文を手動投入し、設定された全投稿先のジョブをqueue/に作成します。\nTEXTを省略した場合、本文は「おはようございます」になります。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
+  examples: ["ruby bin/post",
+             'ruby bin/post "任意の本文"',
              'ruby bin/post -- "-から始まる本文"'],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
           "Fedibird監視を経由しない、写真なしの手動投稿に使います。"])
 SnsMultipost::Cli.parse!(parser)
-text = ARGV.join(" ").strip
-SnsMultipost::Cli.usage_error(parser, "本文を指定してください") if text.empty?
+text = SnsMultipost::Cli.text_or_default(default: "おはようございます")
 
 config = SnsMultipost::Config.load
 queue = SnsMultipost::JobQueue.new

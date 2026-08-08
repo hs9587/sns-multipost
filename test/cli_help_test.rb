@@ -1,6 +1,7 @@
 require_relative "test_helper"
 require "open3"
 require "rbconfig"
+require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
@@ -76,11 +77,19 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "\n  このコマンドだけでは各SNSへの投稿は実行しません。\n"
   end
 
-  def test_post_requires_text
-    _stdout, stderr, status = run_cli("post")
-    assert_equal 2, status.exitstatus
-    assert_includes stderr, "本文を指定してください"
-    assert_includes stderr, "Usage: ruby bin/post"
+  def test_post_uses_default_text_when_text_is_omitted
+    assert_equal "おはようございます",
+                 SnsMultipost::Cli.text_or_default([], default: "おはようございます")
+    assert_equal "任意の 本文",
+                 SnsMultipost::Cli.text_or_default([" 任意の", "本文 "], default: "おはようございます")
+  end
+
+  def test_post_help_describes_default_text
+    stdout, _stderr, status = run_cli("post", "--help")
+    assert status.success?
+    assert_includes stdout, "Usage: ruby bin/post [options] [TEXT...]"
+    assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
+    assert_includes stdout, "ruby bin/post"
   end
 
   def test_retry_requires_at_least_one_file
