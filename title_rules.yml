@@ -16,7 +16,7 @@ coffee:
   shops: [猫廼舎]
 
 # 主食語は主菜より優先。まず foods_priority を見て、無ければ foods
-foods_priority: [パン, ブレッド, サンド, デニッシュ, ライス]
-foods: [スパゲティ, そば, うどん, ラーメン, カレー, ごはん, おにぎり]
+foods_priority: [パン, ブレッド, サンド, デニッシュ, ごはん, ライス]
+foods: [スパゲティ, そば, ソバ, 蕎麦, うどん, ラーメン, カレー, おにぎり]
 
 fallback_length: 12
