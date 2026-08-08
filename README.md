@@ -6,17 +6,17 @@
 旧 [SNS_multi_post](https://github.com/hs9587/SNS_multi_post)（Ruby+Selenium 世代）の後継として、
 「トリガ → ファイルキュー → 投稿実行」を分離した構成で作り直している。
 
-## 現在の状態（2026-08-06）
+## 現在の状態（2026-08-08）
 
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
-- Fedibird / Bluesky / Tumblr / Blogger は実投稿確認済み
+- Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
 - X は OAuth1.0a 認証まで確認済み。API課金は行わず、Phase 3でブラウザ投稿を実装する
-- Threads は公式APIによる `bin/post` からのテキスト投稿とOAuth補助を実装済み（実投稿確認待ち）
+- Threads は公式APIによる `bin/post` からのテキスト投稿、OAuth、長期トークン保存まで稼働確認済み
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
-- 次はThreadsの実投稿を確認し、その後Jotterのテキスト投稿へ進む
+- 次はJotterを含むPhase 3ブラウザ組の優先順を検討する
 
 テストは `bundle exec rake test` で実行する。
 
@@ -32,7 +32,7 @@
 | Instagram | 未実装 | Phase 3 のブラウザ組。画像付き投稿のハブ候補 |
 | mixi / mixi2 | 未実装 | Phase 3 のブラウザ組。mixi2 は Web 投稿可否の調査が必要 |
 | Jotter.me | 調査中 | 初期版はテキストのみ。ブラウザ操作スパイクを進行中 |
-| Threads | APIコード完成・実投稿確認待ち | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
+| Threads | 稼働 | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
 | Facebook | 未実装 | 個人プロフィールのためPhase 3のブラウザ組 |
 
 ## 主な要件

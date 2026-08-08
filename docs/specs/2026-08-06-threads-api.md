@@ -1,7 +1,7 @@
 # Threads API テキスト投稿
 
 - 日付: 2026-08-06
-- 状態: 実装・自動テスト完了、OAuth設定と実投稿確認待ち
+- 状態: 実装・自動テスト・OAuth設定・実投稿確認完了（2026-08-08）
 - 対象入口: `bin/post` のみ（`targets.post`）
 
 ## 方針
@@ -24,5 +24,11 @@ Threads はブラウザ操作ではなく、Meta公式 Threads API を使う。
 
 画像投稿は今回の対象外。Facebook個人プロフィールは公式投稿APIの対象外なので、
 Phase 3のブラウザ投稿として扱う。
+
+## 実投稿確認
+
+`bin/post` で作成した Threads 向けジョブを `bin/run_queue` で処理し、
+APIが投稿IDを返すことと、Threads上に投稿が公開されたことを確認済み。
+実際の投稿IDや認証情報は文書・Gitには保存しない。
 
 公式資料: https://www.postman.com/meta/threads/documentation/dht3nzz/threads-api

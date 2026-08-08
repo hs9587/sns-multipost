@@ -78,6 +78,9 @@ Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_ba
 
 7. `Threadsの長期アクセストークンを保存しました` と表示されたら、
    `targets.post` に `threads` を追加する
+8. `bin/post` でテスト投稿をキューへ入れ、他の未処理ジョブがないことを確認してから
+   `bin/run_queue` を実行する。`ok threads` と投稿IDが表示され、Threads上で投稿を
+   確認できれば設定完了
 
 認証情報と長期トークンは表示・Git管理しない。認可をやり直す場合も
 `--authorize` から開始し、新しい `state` を使う。
