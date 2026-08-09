@@ -101,6 +101,8 @@ Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_ba
     ruby bin/mixi2_smoke
 
 `mixi2 smoke test: ok` と表示されれば、タスク実行用ブラウザから投稿画面まで到達できる。
+`targets.watch` または `targets.post` に `mixi2` を追加すると、`bin/run_queue` が
+専用Chromeを使って投稿する。専用Chromeを手動で開いたまま実行しないこと。
 
 Chromeが標準の場所にない場合は `SNS_MULTIPOST_CHROME_PATH` 環境変数へ
 `chrome.exe` のフルパスを設定する。

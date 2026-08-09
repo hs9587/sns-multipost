@@ -83,12 +83,14 @@ sns-multipost/
 |----|-----|------|
 | API組 | Bluesky / Tumblr / Blogger / Fedibird / Threads | 各 REST API（HTTP+JSON、gem は最小限）。Threads は `bin/post` のテキストのみ |
 | API組(保管) | X | API v2 + OAuth1.0a のコードと認証確認結果は残すが、クレジット購入予定がないため実運用には使わない |
-| ブラウザ組 | Instagram / mixi旧 / mixi2 / Jotter.me / Facebook個人プロフィール | 未実装。サービスごとのスパイクで操作特性と規約を確認する |
+| ブラウザ組(稼働) | mixi2 | 専用ChromeプロファイルをFerrumで操作。テキスト・画像投稿の実投稿確認済み |
+| ブラウザ組(未実装) | Instagram / mixi旧 / Jotter.me / Facebook個人プロフィール | サービスごとのスパイクで操作特性と規約を確認する |
 
 - Xの公式Automation rulesはWebサイトのスクリプト操作を禁じているため、Xをブラウザ自動投稿しない。必要なら本文準備と公式Webを開くところまでの手動引き渡しにする
 - Instagram は画像付き投稿のハブ候補。写真なし投稿は Threads API へ直接投稿し、Facebook 個人プロフィールはブラウザ投稿で追加する
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
 - Jotter.me は **v1 テキスト投稿のみ**。セーブポイント URL を毎回開き、同一ブラウザプロセス内で投稿する。画像投稿には DEN が必要なためスコープ外
+- mixi2は専用Chromeプロファイル、Ferrum、最大150文字・画像4枚で実装し、キュー経由の実投稿まで確認済み
 
 ### 要調査（実装フェーズ最初に小さく検証）
 
@@ -148,6 +150,6 @@ sns-multipost/
 - Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認。APIコードは保管する
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
 - Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
-- Phase 3: mixi2を最初の候補としてログイン後DOMの調査に着手。JotterのDOMと認証方式は一部調査済み。Instagram / mixi / Facebookは未着手。Xは規約上ブラウザ自動化しない
+- Phase 3: mixi2は専用Chromeからの実投稿まで完了。JotterのDOMと認証方式は一部調査済み。Instagram / mixi / Facebookは未着手。Xは規約上ブラウザ自動化しない
 - 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせできる
 - ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃
