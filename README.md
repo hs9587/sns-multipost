@@ -10,7 +10,7 @@
 
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
-- X は OAuth1.0a 認証まで確認済み。API課金は行わず、Phase 3でブラウザ投稿を実装する
+- X は OAuth1.0a 認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
 - Threads は公式APIによる `bin/post` からのテキスト投稿、OAuth、長期トークン保存まで稼働確認済み
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
@@ -28,9 +28,9 @@
 | Bluesky | 稼働 | AT Protocol。画像対応 |
 | Tumblr | 稼働 | OAuth2。トークン自動更新、画像対応 |
 | Blogger | 稼働 | Google OAuth2。画像は現在 Fedibird の画像 URL をホットリンク |
-| X | APIコード完成・ブラウザ未実装 | APIは課金せず、Phase 3でログイン済みブラウザから投稿する |
+| X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
 | Instagram | 未実装 | Phase 3 のブラウザ組。画像付き投稿のハブ候補 |
-| mixi / mixi2 | 未実装 | Phase 3 のブラウザ組。mixi2 は Web 投稿可否の調査が必要 |
+| mixi / mixi2 | 未実装 | Phase 3 のブラウザ組。両方とも公式にWeb投稿を提供 |
 | Jotter.me | 調査中 | 初期版はテキストのみ。ブラウザ操作スパイクを進行中 |
 | Threads | 稼働 | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
 | Facebook | 未実装 | 個人プロフィールのためPhase 3のブラウザ組 |
@@ -55,6 +55,7 @@
     ruby bin/retry failed/x.json  # 失敗ジョブを再実行
     ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
     ruby bin/threads_auth --help  # Threads API の初回OAuth認証
+    ruby bin/browser_login mixi2  # ブラウザ投稿専用Chromeで初回ログイン
     ruby bin/whoami               # Fedibird の account_id 確認
 
 全コマンドで `-h` / `--help` を利用できる。オプション、引数、実投稿に関する注意は
@@ -70,12 +71,15 @@
 
 ## ロードマップ
 
-1. Jotter のログイン完了判定と投稿画面への遷移を確定し、テキストポスターを実装
-2. X / Instagram / mixi / mixi2 のブラウザポスターを実装
-3. Facebook 個人プロフィールのブラウザ投稿を追加
-4. Blogger の画像を恒久的な画像ホストへ移行
-5. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
+1. mixi2 のログイン後DOMを調査し、最初のブラウザポスター候補として適否を確定
+2. mixi、Jotter のブラウザポスターを実装
+3. Instagram はアカウント種別に応じて公式APIを優先し、Facebook個人プロフィールはブラウザ投稿を検討
+4. X は投稿文を用意して公式Webへ手動で引き渡す方式を検討
+5. Blogger の画像を恒久的な画像ホストへ移行
+6. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
 
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
 Phase 2 の実装結果は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、
+Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-threads-api.md)、
+Phase 3の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

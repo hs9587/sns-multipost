@@ -1,7 +1,7 @@
 # sns-multipost 設計ドキュメント
 
 - 日付: 2026-07-19
-- 状態: ユーザー承認済み設計。Phase 1・2 実装完了、Phase 3 着手前（2026-08-04 現在）
+- 状態: ユーザー承認済み設計。Phase 1・2 実装完了、Phase 3 調査着手（2026-08-09 現在）
 - リポジトリ: GitHub `hs9587/sns-multipost`（パブリック・新規作成）
 
 ## 1. 目的と背景
@@ -83,18 +83,20 @@ sns-multipost/
 |----|-----|------|
 | API組 | Bluesky / Tumblr / Blogger / Fedibird / Threads | 各 REST API（HTTP+JSON、gem は最小限）。Threads は `bin/post` のテキストのみ |
 | API組(保管) | X | API v2 + OAuth1.0a のコードと認証確認結果は残すが、クレジット購入予定がないため実運用には使わない |
-| ブラウザ組 | X / Instagram / mixi旧 / mixi2 / Jotter.me | 未実装。Playwright を第一候補としつつ、Jotter は Ferrum で操作特性を調査中 |
+| ブラウザ組 | Instagram / mixi旧 / mixi2 / Jotter.me / Facebook個人プロフィール | 未実装。サービスごとのスパイクで操作特性と規約を確認する |
 
+- Xの公式Automation rulesはWebサイトのスクリプト操作を禁じているため、Xをブラウザ自動投稿しない。必要なら本文準備と公式Webを開くところまでの手動引き渡しにする
 - Instagram は画像付き投稿のハブ候補。写真なし投稿は Threads API へ直接投稿し、Facebook 個人プロフィールはブラウザ投稿で追加する
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
 - Jotter.me は **v1 テキスト投稿のみ**。セーブポイント URL を毎回開き、同一ブラウザプロセス内で投稿する。画像投稿には DEN が必要なためスコープ外
 
 ### 要調査（実装フェーズ最初に小さく検証）
 
-1. mixi2 の Web からの投稿可否
+1. mixi2 のログイン後DOMと投稿完了判定（Web投稿の提供自体は確認済み）
 2. Jotter.me の安定したログイン完了判定と「メモを作成します」トリガのセレクタ
-3. Instagram と X のブラウザ自動化検知・投稿画面の安定性
-4. X API は調査完了。Pay Per Use のクレジットは購入せず、ブラウザ投稿へ切り替える
+3. Instagram は対象アカウントで公式投稿APIを利用できるか
+4. Facebook個人プロフィールのブラウザ操作上の安定性と利用条件
+5. X APIはクレジットを購入せず、Web画面の自動操作も行わない
 
 ## 8. タイトル辞書
 
@@ -140,12 +142,12 @@ sns-multipost/
 - タイトル判定の LLM ハイブリッド（c案）
 - note への投稿（対象外と決定済み）
 
-## 14. 実装状況と残課題（2026-08-04）
+## 14. 実装状況と残課題（2026-08-09）
 
 - Phase 1: ファイルキュー、Fedibird 監視・投稿、タイトル辞書、再試行まで完了
-- Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認し、実運用はブラウザ投稿へ切替決定
+- Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認。APIコードは保管する
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
 - Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
-- Phase 3: Jotter の DOM と認証方式を調査中。X / Instagram / mixi / mixi2 のブラウザ投稿は未着手
+- Phase 3: mixi2を最初の候補としてログイン後DOMの調査に着手。JotterのDOMと認証方式は一部調査済み。Instagram / mixi / Facebookは未着手。Xは規約上ブラウザ自動化しない
 - 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせできる
 - ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃

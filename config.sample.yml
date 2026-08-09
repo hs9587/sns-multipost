@@ -27,6 +27,7 @@ x:
   access_token: ""               # ユーザーのアクセストークン
   access_token_secret: ""        # 同シークレット
   username: "you"                # URL 組立用（@ 抜きのユーザー名）
+  # APIクレジットを購入する場合のみtargetsへ追加する。Web画面の自動操作は行わない。
 
 threads:
   app_id: ""                     # MetaアプリのThreads App ID
@@ -43,13 +44,11 @@ targets:
     - bluesky
     - tumblr
     - blogger
-    - x
   post:
     - fedibird
     - bluesky
     - tumblr
     - blogger
-    - x
     - threads
 
 # true にすると投稿直前で止まる（実投稿しない）

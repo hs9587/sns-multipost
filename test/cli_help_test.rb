@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[dryrun_titles post retry run_queue threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles post retry run_queue threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -60,6 +60,13 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "Threadsへ投稿しません"
   end
 
+  def test_browser_login_help_explains_isolated_profile
+    stdout, _stderr, status = run_cli("browser_login", "--help")
+    assert status.success?
+    assert_includes stdout, "state/browser/"
+    assert_includes stdout, "このコマンドは投稿を行いません"
+  end
+
   def test_help_is_compact_without_blank_lines_between_sections
     stdout, _stderr, status = run_cli("watch", "--help")
     assert status.success?
@@ -97,6 +104,13 @@ class CliHelpTest < Minitest::Test
     assert_equal 2, status.exitstatus
     assert_includes stderr, "失敗ジョブのJSONファイルを指定してください"
     assert_includes stderr, "Usage: ruby bin/retry"
+  end
+
+  def test_browser_login_requires_service
+    _stdout, stderr, status = run_cli("browser_login")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "SNSを指定してください"
+    assert_includes stderr, "Usage: ruby bin/browser_login"
   end
 
   def test_dryrun_titles_rejects_invalid_count
