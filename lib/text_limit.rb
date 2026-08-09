@@ -4,7 +4,8 @@ module SnsMultipost
     LIMITS = {
       "x" => 280,
       "bluesky" => 300,
-      "threads" => 500
+      "threads" => 500,
+      "mixi2" => 150
     }.freeze
 
     ELLIPSIS = "…".freeze

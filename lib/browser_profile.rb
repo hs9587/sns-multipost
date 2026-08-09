@@ -35,6 +35,10 @@ module SnsMultipost
       File.join(@root, "state", "browser", service)
     end
 
+    def chrome_path
+      resolved_chrome_path
+    end
+
     private
 
     def resolved_chrome_path

@@ -1,7 +1,7 @@
 # Phase 3 ブラウザ投稿
 
 - 日付: 2026-08-09
-- 状態: 調査着手
+- 状態: mixi2ポスター実装・smoke確認完了、実投稿確認待ち
 
 ## 方針
 
@@ -36,12 +36,21 @@ Xは公式Automation rulesがWebサイトのスクリプト操作を禁止して
 - 投稿画面はアクセシブル名 `新規ポスト作成` のdialog
 - 本文欄は `.tiptap.ProseMirror[contenteditable="true"]`
 - 送信は `button[type="submit"][aria-label="送信"]`。本文が空ならdisabled
-- 添付はmultipleな `input[type="file"]`。JPEG / PNG / WebP / GIF / MP4 / QuickTime対応
+- 添付は `input[type="file"]`。JPEG / PNG / WebP / GIF / MP4 / QuickTime対応。
+  実行環境によりmultiple属性が無いため、最大4枚を1枚ずつ追加する
 - 通常ポストは約150文字枠。公開先は公開、プロフィールのみ、コミュニティから選ぶ
 
 CLI実行用には `bin/browser_login mixi2` で専用Chromeを開き、ログイン状態を
 Git管理外の `state/browser/mixi2` に保存する。次はこのプロファイルをFerrumから開き、
-ログイン保持と投稿画面到達を確認する。
+ログイン保持と投稿画面到達を確認する。Ferrumは既定でincognitoコンテキストを作るため、
+永続プロファイル利用時は `incognito: false` を必ず指定する。またFerrum 0.17.2は
+トップレベルの `user_data_dir:` を認識しないため、`browser_options` の
+`user-data-dir` でChrome起動引数を上書きする。
+
+`bin/mixi2_smoke` により、専用プロファイルのログイン保持、ホーム到達、投稿画面の
+本文欄・送信ボタン・メディア入力を確認し、投稿せず閉じるところまで成功した。
+`Poster::Mixi2` は本文を150 graphemeへ収め、画像を先頭4枚に制限してFerrumへ渡す。
+残作業はライブ投稿確認と、失敗時スクリーンショットの保存。
 
 ## 参照
 

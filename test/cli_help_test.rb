@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles post retry run_queue threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles mixi2_smoke post retry run_queue threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -65,6 +65,13 @@ class CliHelpTest < Minitest::Test
     assert status.success?
     assert_includes stdout, "state/browser/"
     assert_includes stdout, "このコマンドは投稿を行いません"
+  end
+
+  def test_mixi2_smoke_help_promises_not_to_post
+    stdout, _stderr, status = run_cli("mixi2_smoke", "--help")
+    assert status.success?
+    assert_includes stdout, "mixi2への投稿は行いません"
+    assert_includes stdout, "ruby bin/browser_login mixi2"
   end
 
   def test_help_is_compact_without_blank_lines_between_sections

@@ -4,4 +4,5 @@ require_relative "tumblr"
 require_relative "blogger"
 require_relative "x"
 require_relative "threads"
+require_relative "mixi2"
 # Phase 2 以降、実装したポスターをここに追記する

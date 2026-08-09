@@ -30,7 +30,8 @@
 | Blogger | 稼働 | Google OAuth2。画像は現在 Fedibird の画像 URL をホットリンク |
 | X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
 | Instagram | 未実装 | Phase 3 のブラウザ組。画像付き投稿のハブ候補 |
-| mixi / mixi2 | 未実装 | Phase 3 のブラウザ組。両方とも公式にWeb投稿を提供 |
+| mixi | 未実装 | Phase 3 のブラウザ組。公式にPCブラウザからの日記投稿を提供 |
+| mixi2 | コード完成・実投稿確認待ち | 専用Chromeのログイン保持と投稿画面smoke確認済み。本文150文字・画像4枚 |
 | Jotter.me | 調査中 | 初期版はテキストのみ。ブラウザ操作スパイクを進行中 |
 | Threads | 稼働 | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
 | Facebook | 未実装 | 個人プロフィールのためPhase 3のブラウザ組 |
@@ -56,6 +57,7 @@
     ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
     ruby bin/threads_auth --help  # Threads API の初回OAuth認証
     ruby bin/browser_login mixi2  # ブラウザ投稿専用Chromeで初回ログイン
+    ruby bin/mixi2_smoke          # 投稿せずmixi2ログインと投稿画面を確認
     ruby bin/whoami               # Fedibird の account_id 確認
 
 全コマンドで `-h` / `--help` を利用できる。オプション、引数、実投稿に関する注意は
@@ -71,7 +73,7 @@
 
 ## ロードマップ
 
-1. mixi2 のログイン後DOMを調査し、最初のブラウザポスター候補として適否を確定
+1. mixi2 のブラウザポスターを実投稿確認し、失敗時スクリーンショットを追加
 2. mixi、Jotter のブラウザポスターを実装
 3. Instagram はアカウント種別に応じて公式APIを優先し、Facebook個人プロフィールはブラウザ投稿を検討
 4. X は投稿文を用意して公式Webへ手動で引き渡す方式を検討

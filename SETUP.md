@@ -96,6 +96,12 @@ Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_ba
 ホーム画面が表示されたらChromeを閉じる。メールアドレスや認証コードは設定ファイルへ
 保存しない。ログイン状態を含む専用プロファイルはGit管理外の `state/browser/mixi2` に残る。
 
+ログイン保持と投稿画面を、投稿せずに確認する:
+
+    ruby bin/mixi2_smoke
+
+`mixi2 smoke test: ok` と表示されれば、タスク実行用ブラウザから投稿画面まで到達できる。
+
 Chromeが標準の場所にない場合は `SNS_MULTIPOST_CHROME_PATH` 環境変数へ
 `chrome.exe` のフルパスを設定する。
 

@@ -50,6 +50,7 @@ targets:
     - tumblr
     - blogger
     - threads
+    - mixi2
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true

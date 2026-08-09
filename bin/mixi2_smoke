@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "mixi2_browser"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/mixi2_smoke [options]",
+  description: "sns-multipost専用Chromeのmixi2ログイン状態と投稿画面への到達を確認します。\n投稿画面は本文を入力せず閉じ、mixi2への投稿は行いません。",
+  examples: ["ruby bin/mixi2_smoke"],
+  notes: ["先に ruby bin/browser_login mixi2 で専用Chromeへログインしてください。",
+          "確認後、起動したChromeは自動的に閉じます。"])
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+
+result = SnsMultipost::Mixi2Browser.new.smoke
+if result.values_at("opened", "hasEditor", "hasSubmit", "hasMedia").all?
+  puts "mixi2 smoke test: ok"
+  puts "ログイン状態と投稿画面（本文・送信・メディア添付）を確認しました。"
+else
+  raise "mixi2投稿画面の構成が想定と違います: #{result.inspect}"
+end
