@@ -73,12 +73,21 @@
 
 ## ロードマップ
 
-1. mixi2 の失敗時スクリーンショットを追加
-2. mixi、Jotter のブラウザポスターを実装
-3. Instagram はアカウント種別に応じて公式APIを優先し、Facebook個人プロフィールはブラウザ投稿を検討
-4. X は投稿文を用意して公式Webへ手動で引き渡す方式を検討
-5. Blogger の画像を恒久的な画像ホストへ移行
-6. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
+1. mixi、Jotter のブラウザポスターを実装
+2. Instagram はアカウント種別に応じて公式APIを優先し、Facebook個人プロフィールはブラウザ投稿を検討
+3. X は投稿文を用意して公式Webへ手動で引き渡す方式を検討
+4. Blogger の画像を恒久的な画像ホストへ移行
+5. ページング、HTTP タイムアウト、排他制御、古いジョブ・画像の清掃を追加
+
+## 保存容量と清掃
+
+ブラウザ投稿の失敗時は、原因調査用に表示中の画面を `failed/<ジョブ名>.png` へ保存する。
+成功時には保存せず、スクリーンショット、ジョブ、画像、ChromeプロファイルはいずれもGit管理外とする。
+
+開発中は機能の節目に `queue/`、`done/`、`failed/`、`state/media/`、`state/browser/`、`logs/` の
+ファイル数と容量を確認する。実稼働後は増加傾向を見て保持日数と容量上限を決め、古い成功ジョブ、
+参照されなくなった画像、失敗スクリーンショット、Chromeキャッシュの順にローテーションを検討する。
+失敗ジョブ本体は、再実行や原因調査が済むまで自動削除しない。
 
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
 Phase 2 の実装結果は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、

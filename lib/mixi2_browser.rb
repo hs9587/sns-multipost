@@ -1,4 +1,5 @@
 require_relative "browser_profile"
+require "fileutils"
 
 module SnsMultipost
   class Mixi2Browser
@@ -125,7 +126,7 @@ module SnsMultipost
       browser.quit if @owns_browser && @browser
     end
 
-    def post(text:, media_paths: [])
+    def post(text:, media_paths: [], failure_screenshot_path: nil)
       _, _, composer = open_composer
 
       editor = composer.at_css(EDITOR_SELECTOR)
@@ -153,6 +154,9 @@ module SnsMultipost
       url = wait_for { browser.evaluate(POST_URL_JS, text[0, 40], existing_urls) }
       raise "mixi2の新しい投稿を確認できません" unless url
       { posted: true, url: url }
+    rescue StandardError
+      capture_failure_screenshot(failure_screenshot_path)
+      raise
     ensure
       browser.quit if @owns_browser && @browser
     end
@@ -247,6 +251,16 @@ module SnsMultipost
           # 投稿用データとして画像を取り込むまで時間がかかることがある。
           @sleeper.call(MEDIA_SETTLE_SECONDS)
       attached
+    end
+
+    def capture_failure_screenshot(path)
+      return false if path.to_s.empty? || !@browser
+
+      FileUtils.mkdir_p(File.dirname(path))
+      browser.screenshot(path: path, full: false)
+      true
+    rescue StandardError
+      false
     end
 
     def browser

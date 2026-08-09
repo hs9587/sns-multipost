@@ -50,9 +50,10 @@ class Mixi2BrowserTest < Minitest::Test
   class FakeBrowser
     attr_reader :url, :quit_called, :text, :media_paths, :network
 
-    def initialize
+    def initialize(post_url: true)
       @composer_open = false
       @submitted = false
+      @post_url = post_url
       @network = FakeNetwork.new
     end
 
@@ -73,7 +74,7 @@ class Mixi2BrowserTest < Minitest::Test
       when SnsMultipost::Mixi2Browser::SUBMIT_READY_JS
         !@text.to_s.empty?
       when SnsMultipost::Mixi2Browser::POST_URL_JS
-        @submitted ? "https://mixi.social/@me/posts/123" : nil
+        @submitted && @post_url ? "https://mixi.social/@me/posts/123" : nil
       when SnsMultipost::Mixi2Browser::POST_URLS_JS
         []
       when SnsMultipost::Mixi2Browser::ATTACHMENT_STATE_JS
@@ -110,6 +111,12 @@ class Mixi2BrowserTest < Minitest::Test
     def quit
       @quit_called = true
     end
+
+    def screenshot(path:, full:)
+      @screenshot_call = { path: path, full: full }
+    end
+
+    attr_reader :screenshot_call
   end
 
   def test_smoke_checks_login_and_composer_without_posting
@@ -164,5 +171,22 @@ class Mixi2BrowserTest < Minitest::Test
     assert_equal 1, result["previews"]
     refute browser.instance_variable_get(:@submitted)
     refute browser.quit_called
+  end
+
+  def test_post_captures_full_screenshot_before_reporting_failure
+    Dir.mktmpdir do |dir|
+      browser = FakeBrowser.new(post_url: false)
+      path = File.join(dir, "failed", "job.png")
+
+      error = assert_raises(RuntimeError) do
+        SnsMultipost::Mixi2Browser.new(
+          browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+            text: "失敗テスト", failure_screenshot_path: path)
+      end
+
+      assert_match(/新しい投稿を確認できません/, error.message)
+      assert_equal({ path: path, full: false }, browser.screenshot_call)
+      refute browser.quit_called
+    end
   end
 end

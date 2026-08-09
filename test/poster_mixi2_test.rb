@@ -4,16 +4,17 @@ require "poster/mixi2"
 
 class PosterMixi2Test < Minitest::Test
   class FakeClient
-    attr_reader :text, :media_paths
+    attr_reader :text, :media_paths, :failure_screenshot_path
 
-    def post(text:, media_paths:)
+    def post(text:, media_paths:, failure_screenshot_path: nil)
       @text = text
       @media_paths = media_paths
+      @failure_screenshot_path = failure_screenshot_path
       { posted: true, url: "https://mixi.social/@me/posts/123" }
     end
   end
 
-  Job = Struct.new(:sns, :text, :title, :media_paths, keyword_init: true)
+  Job = Struct.new(:sns, :text, :title, :media_paths, :path, keyword_init: true)
 
   def config(dry_run: false)
     SnsMultipost::Config.new("dry_run" => dry_run)
@@ -41,6 +42,19 @@ class PosterMixi2Test < Minitest::Test
 
     assert result[:dry_run]
     assert_nil client.text
+  end
+
+  def test_failure_screenshot_is_placed_beside_failed_job
+    Dir.mktmpdir do |dir|
+      client = FakeClient.new
+      job_path = File.join(dir, "queue", "20260809-120000_mixi2_abcd.json")
+      job = Job.new(sns: "mixi2", text: "本文", media_paths: [], path: job_path)
+
+      SnsMultipost::Poster::Mixi2.new(config, client: client).perform(job)
+
+      assert_equal File.join(dir, "failed", "20260809-120000_mixi2_abcd.png"),
+                   client.failure_screenshot_path
+    end
   end
 
   def test_registered_in_registry
