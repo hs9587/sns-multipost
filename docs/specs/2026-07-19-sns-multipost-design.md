@@ -19,7 +19,7 @@
 | 実行形態 | 非常駐。ファイルキュー、タスクスケジューラ駆動 |
 | 投稿先 | X / Instagram / mixi旧 / mixi2 / Bluesky / Blogger / Tumblr / Jotter.me。写真なし投稿向けに Facebook・Threads 直接投稿も追加予定 |
 | 入口 | Fedibird（きっかけ投稿自体が Fedibird 投稿を兼ねる） |
-| 投稿内容 | きっかけ投稿と同一（ハッシュタグ含め全文）。画像は先頭から各SNS上限まで（mixi=1枚） |
+| 投稿内容 | きっかけ投稿と同一（ハッシュタグ含め全文）。画像は先頭から各SNS上限まで（mixiつぶやき=1枚） |
 | タイトル | 本文は全SNS同一。タイトル欄のあるSNSのみ辞書で導出（後述） |
 | リポジトリ | GitHub hs9587/sns-multipost、パブリック |
 | 本番機 | 稼働中の Windows 機。git clone + 手順書で移設可能に |

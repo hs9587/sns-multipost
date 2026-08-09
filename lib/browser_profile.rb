@@ -3,6 +3,7 @@ require "fileutils"
 module SnsMultipost
   class BrowserProfile
     SERVICE_URLS = {
+      "mixi" => "https://mixi.jp/home.pl",
       "mixi2" => "https://mixi.social/home"
     }.freeze
 

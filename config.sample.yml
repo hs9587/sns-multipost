@@ -44,12 +44,14 @@ targets:
     - bluesky
     - tumblr
     - blogger
+    - mixi
   post:
     - fedibird
     - bluesky
     - tumblr
     - blogger
     - threads
+    - mixi
     - mixi2
 
 # true にすると投稿直前で止まる（実投稿しない）

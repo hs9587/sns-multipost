@@ -17,6 +17,20 @@ class BrowserProfileTest < Minitest::Test
     end
   end
 
+  def test_builds_isolated_mixi_chrome_command
+    Dir.mktmpdir do |dir|
+      chrome = File.join(dir, "chrome.exe")
+      File.write(chrome, "")
+      profile = SnsMultipost::BrowserProfile.new(root: dir, chrome_path: chrome)
+
+      command = profile.command("mixi")
+
+      assert_includes command, "--user-data-dir=#{File.join(dir, 'state', 'browser', 'mixi')}"
+      assert_equal "https://mixi.jp/home.pl", command.last
+      assert Dir.exist?(profile.profile_dir("mixi"))
+    end
+  end
+
   def test_rejects_unknown_service
     Dir.mktmpdir do |dir|
       profile = SnsMultipost::BrowserProfile.new(root: dir, chrome_path: "missing")

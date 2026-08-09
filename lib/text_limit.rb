@@ -5,6 +5,7 @@ module SnsMultipost
       "x" => 280,
       "bluesky" => 300,
       "threads" => 500,
+      "mixi" => 150,
       "mixi2" => 150
     }.freeze
 
