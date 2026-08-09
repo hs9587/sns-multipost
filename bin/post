@@ -4,24 +4,38 @@ require "time"
 require "cli"
 require "config"
 require "job_queue"
+require "poster/all"
 require "title_rules"
 
+target = nil
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/post [options] [TEXT...]",
   description: "sns-multipostへ本文を手動投入し、設定された全投稿先のジョブをqueue/に作成します。\nTEXTを省略した場合、本文は「おはようございます」になります。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
   examples: ["ruby bin/post",
+             'ruby bin/post --target jotter "Jotter ブラウザ投稿テスト"',
              'ruby bin/post "任意の本文"',
              'ruby bin/post -- "-から始まる本文"'],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
-          "Fedibird監視を経由しない、写真なしの手動投稿に使います。"])
+          "--targetを省略するとtargets.postの全投稿先へ、指定するとそのSNSだけへキューを作ります。",
+          "Fedibird監視を経由しない、写真なしの手動投稿に使います。"]
+) do |opts|
+  opts.on("-t", "--target SNS", "指定した1つのSNSだけをキューへ入れる") do |value|
+    target = value.to_s.downcase
+  end
+end
 SnsMultipost::Cli.parse!(parser)
 text = SnsMultipost::Cli.text_or_default(default: "おはようございます")
+
+if target && !SnsMultipost::Poster::REGISTRY.key?(target)
+  SnsMultipost::Cli.usage_error(parser, "未実装のSNSです: #{target}")
+end
 
 config = SnsMultipost::Config.load
 queue = SnsMultipost::JobQueue.new
 title = SnsMultipost::TitleRules.load.title_for(text)
 
-config.targets_for(:post).each do |sns|
+targets = target ? [target] : config.targets_for(:post)
+targets.each do |sns|
   path = queue.enqueue(SnsMultipost::Job.new(
     sns: sns, text: text, title: title, created_at: Time.now.iso8601))
   puts "queued: #{path}"

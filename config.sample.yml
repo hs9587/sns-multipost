@@ -37,6 +37,11 @@ threads:
   # 手動取得したトークンを直接使う場合だけ access_token を記入する。
   access_token: ""
 
+jotter:
+  # セーブポイントURLはログイン資格情報です。実際の値はGit管理外のconfig.ymlだけに記入します。
+  savepoint_url: ""
+  account_name: "your-name"      # 誤った一時アカウントへの投稿を防ぐ確認用の表示名
+
 # 投稿先。ポスター実装済みで、かつ認証情報を記入した SNS だけ並べる。
 # watch は Fedibird の新着から、post は bin/post の本文から作るジョブの投稿先。
 targets:
@@ -45,6 +50,7 @@ targets:
     - tumblr
     - blogger
     - mixi
+    - jotter
   post:
     - fedibird
     - bluesky
@@ -53,6 +59,7 @@ targets:
     - threads
     - mixi
     - mixi2
+    - jotter
 
 # true にすると投稿直前で止まる（実投稿しない）
 dry_run: true

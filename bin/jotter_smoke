@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "config"
+require "jotter_browser"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/jotter_smoke [options]",
+  description: "sns-multipostのJotterセーブポイント復元と投稿フォームを確認します。\n本文を送信せず、公開範囲を「公開」に選べるところまで確認してブラウザを閉じます。",
+  examples: ["ruby bin/jotter_smoke"],
+  notes: ["先にconfig.ymlのjotter.savepoint_urlとjotter.account_nameを設定してください。",
+          "セーブポイントURLは秘密情報です。画面やログには表示しません。"])
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+
+config = SnsMultipost::Config.load
+settings = config["jotter"] || {}
+result = SnsMultipost::JotterBrowser.new(
+  savepoint_url: settings["savepoint_url"],
+  account_name: settings["account_name"],
+  logger: ->(message) { puts message }).smoke
+
+if result.values_at("hasEditor", "hasSubmit", "hasPublic").all?
+  puts "Jotter smoke test: ok"
+  puts "セーブポイント、本人確認、投稿フォーム、公開範囲を確認しました。投稿はしていません。"
+else
+  raise "Jotter投稿フォームの構造が想定と違います: #{result.inspect}"
+end

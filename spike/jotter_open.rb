@@ -4,7 +4,8 @@
 #        → textarea[name=text] 出現？
 # 投稿はしない。「メモを作成します」釦のセレクタ特定が目的。
 #
-#   export JOTTER_SAVEPOINT='＜セーブポイントURL＞'   # ← 共有しない
+#   # 専用プロファイルへ一度ログイン済みなら、そのまま実行できる
+#   # 初回調査だけは JOTTER_SAVEPOINT をローカル環境変数で渡せる
 #   ruby spike/jotter_open.rb
 
 require "ferrum"
@@ -12,11 +13,13 @@ require "json"
 
 CHROME  = "C:/Program Files/Google/Chrome/Application/chrome.exe"
 PROFILE = File.expand_path("../state/browser/jotter", __dir__)
+JOTTER  = "https://jotter.me/"
 
 READY_JS = <<~'JS'
   (() => {
     const ready = !location.href.includes('/welcome') &&
-      !!document.querySelector('a[href="/ja-JP/wallet/"]');
+      !!document.querySelector('a[href="/ja-JP/wallet/"]') &&
+      !!document.querySelector('input[type="image"].user-face');
     return { url: location.href, ready: ready };
   })()
 JS
@@ -73,10 +76,7 @@ rescue => e
 end
 
 sp = ENV["JOTTER_SAVEPOINT"].to_s.strip
-if sp.empty?
-  warn "[open] 環境変数 JOTTER_SAVEPOINT が未設定です（この行は共有しない）。"
-  exit 1
-end
+start_url = sp.empty? ? JOTTER : sp
 
 puts "[open] seed → 人の介在なしで 2クリック遷移(Jots→メモを作成します)を検証します（headed）。"
 browser = Ferrum::Browser.new(
@@ -85,19 +85,25 @@ browser = Ferrum::Browser.new(
 browser.on(:dialog) { |d| d.accept rescue nil }
 
 begin
-  browser.goto(sp) rescue warn("  seed goto は load 完了を待たず進みます")
+  browser.goto(start_url) rescue warn("  seed goto は load 完了を待たず進みます")
 
   ready = false
-  40.times do |i|
+  last_state = nil
+  15.times do |i|
     sleep 1
-    r = eval_safe(browser, READY_JS)
-    if r.is_a?(Hash) && r["ready"]
+    last_state = eval_safe(browser, READY_JS)
+    if last_state.is_a?(Hash) && last_state["ready"]
       ready = true
-      puts "[open] ログイン準備完了（#{i + 1}秒）URL: #{r["url"]}"
+      puts "[open] ログイン準備完了（#{i + 1}秒）URL: #{last_state["url"]}"
       break
     end
   end
-  (puts("[open] 40秒で ready 検出できず。中止。"); browser.quit; exit 1) unless ready
+  unless ready
+    puts "[open] 15秒で ready 検出できず。中止。"
+    puts "[open] 最終状態: #{last_state.inspect}"
+    browser.quit
+    exit 1
+  end
 
   # 1) Jots(all) をクリック
   jots = eval_safe(browser, CLICK_JOTS_JS)

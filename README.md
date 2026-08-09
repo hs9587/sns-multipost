@@ -16,7 +16,7 @@
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
-- Phase 3はmixi2ポストとmixiつぶやきのテキスト・画像投稿を実投稿確認済み
+- Phase 3はmixi2ポスト、mixiつぶやき、Jotter.me公開テキスト投稿を実投稿確認済み
 
 テストは `bundle exec rake test` で実行する。
 
@@ -32,7 +32,7 @@
 | Instagram | 手動引き渡し予定 | 既存の非公開個人アカウントを維持。プロアカウント化とブラウザ自動化は行わない |
 | mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chromeから実投稿確認済み。本文150文字・画像4枚 |
-| Jotter.me | 調査中 | 初期版はテキストのみ。ブラウザ操作スパイクを進行中 |
+| Jotter.me | 稼働 | セーブポイントを素のChromeで復元後に自動操作を接続。公開テキスト投稿・URL確認済み |
 | Threads | 稼働 | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
 | Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
 
@@ -50,6 +50,7 @@
 
     ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
     ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
+    ruby bin/post --target jotter "本文" # 指定した1 SNSだけのキューを生成
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
     ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める
@@ -60,6 +61,7 @@
     ruby bin/mixi_smoke           # 投稿せずmixiログインとつぶやきフォームを確認
     ruby bin/browser_login mixi2  # ブラウザ投稿専用Chromeで初回ログイン
     ruby bin/mixi2_smoke          # 投稿せずmixi2ログインと投稿画面を確認
+    ruby bin/jotter_smoke         # 投稿せずJotterログイン、本人、投稿フォーム、公開範囲を確認
     ruby bin/whoami               # Fedibird の account_id 確認
 
 全コマンドで `-h` / `--help` を利用できる。オプション、引数、実投稿に関する注意は
@@ -78,7 +80,7 @@
 1. Threadsの画像投稿に対応
 2. Blogger画像の恒久置き場が必要かを、Threads画像対応の方式も踏まえて判断
 3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
-4. ここまでで、JotterとX / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
+4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
 Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
 Blogger側へ自動的に複製されてはいなかった。恒久置き場は直ちに実装せず、Threads画像対応後に要否を判断する。
