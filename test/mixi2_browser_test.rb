@@ -2,6 +2,19 @@ require_relative "test_helper"
 require "mixi2_browser"
 
 class Mixi2BrowserTest < Minitest::Test
+  class FakeNetwork
+    attr_reader :wait_options
+
+    def pending_connections
+      1
+    end
+
+    def wait_for_idle(**options)
+      @wait_options = options
+      true
+    end
+  end
+
   class FakeNode
     def initialize(on_click: nil, on_type: nil, on_select_file: nil)
       @on_click = on_click
@@ -30,11 +43,12 @@ class Mixi2BrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :url, :quit_called, :text, :media_paths
+    attr_reader :url, :quit_called, :text, :media_paths, :network
 
     def initialize
       @composer_open = false
       @submitted = false
+      @network = FakeNetwork.new
     end
 
     def goto(url)
@@ -114,6 +128,8 @@ class Mixi2BrowserTest < Minitest::Test
 
     assert_equal "おはようございます", browser.text
     assert_equal ["one.jpg", "two.png"], browser.media_paths
+    assert_equal 1, browser.network.wait_options[:connections]
+    assert_equal 30, browser.network.wait_options[:timeout]
     assert_equal true, result[:posted]
     assert_equal "https://mixi.social/@me/posts/123", result[:url]
   end

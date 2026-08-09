@@ -93,8 +93,15 @@ module SnsMultipost
         media_paths.each do |path|
           media = browser.at_css(MEDIA_SELECTOR)
           raise "mixi2のメディア入力が見つかりません" unless media
+          baseline_connections = browser.network.pending_connections
           media.select_file(path)
-          @sleeper.call(0.5)
+          @sleeper.call(0.2)
+          idle = browser.network.wait_for_idle(
+            connections: baseline_connections,
+            duration: 0.1,
+            timeout: [@timeout * 2, 30].max)
+          raise "mixi2の画像アップロードが完了しません: #{path}" unless idle
+          @sleeper.call(1)
         end
       end
 
