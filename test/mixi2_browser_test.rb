@@ -16,10 +16,11 @@ class Mixi2BrowserTest < Minitest::Test
   end
 
   class FakeNode
-    def initialize(on_click: nil, on_type: nil, on_select_file: nil)
+    def initialize(on_click: nil, on_type: nil, on_select_file: nil, children: {})
       @on_click = on_click
       @on_type = on_type
       @on_select_file = on_select_file
+      @children = children
     end
 
     def click
@@ -39,6 +40,10 @@ class Mixi2BrowserTest < Minitest::Test
 
     def evaluate(_script)
       true
+    end
+
+    def at_css(selector)
+      @children[selector]
     end
   end
 
@@ -69,6 +74,11 @@ class Mixi2BrowserTest < Minitest::Test
         !@text.to_s.empty?
       when SnsMultipost::Mixi2Browser::POST_URL_JS
         @submitted ? "https://mixi.social/@me/posts/123" : nil
+      when SnsMultipost::Mixi2Browser::POST_URLS_JS
+        []
+      when SnsMultipost::Mixi2Browser::ATTACHMENT_STATE_JS
+        { "files" => @media_paths.to_a.empty? ? 0 : 1,
+          "previews" => @media_paths.to_a.length }
       end
     end
 
@@ -86,6 +96,15 @@ class Mixi2BrowserTest < Minitest::Test
     def xpath(selector)
       return [] unless selector == SnsMultipost::Mixi2Browser::POST_BUTTON_XPATH
       [FakeNode.new(on_click: -> { @composer_open = true })]
+    end
+
+    def css(selector)
+      return [] unless selector == '[role="dialog"]'
+      [FakeNode.new(children: {
+        SnsMultipost::Mixi2Browser::EDITOR_SELECTOR => at_css(SnsMultipost::Mixi2Browser::EDITOR_SELECTOR),
+        SnsMultipost::Mixi2Browser::MEDIA_SELECTOR => at_css(SnsMultipost::Mixi2Browser::MEDIA_SELECTOR),
+        SnsMultipost::Mixi2Browser::SUBMIT_SELECTOR => at_css(SnsMultipost::Mixi2Browser::SUBMIT_SELECTOR)
+      })]
     end
 
     def quit
@@ -122,15 +141,28 @@ class Mixi2BrowserTest < Minitest::Test
 
   def test_post_enters_text_attaches_media_and_confirms_completion
     browser = FakeBrowser.new
+    sleeps = []
     result = SnsMultipost::Mixi2Browser.new(
-      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+      browser: browser, timeout: 0, sleeper: ->(seconds) { sleeps << seconds }).post(
         text: "おはようございます", media_paths: ["one.jpg", "two.png"])
 
     assert_equal "おはようございます", browser.text
     assert_equal ["one.jpg", "two.png"], browser.media_paths
     assert_equal 1, browser.network.wait_options[:connections]
     assert_equal 30, browser.network.wait_options[:timeout]
+    assert_equal 2, sleeps.count(SnsMultipost::Mixi2Browser::MEDIA_SETTLE_SECONDS)
     assert_equal true, result[:posted]
     assert_equal "https://mixi.social/@me/posts/123", result[:url]
+  end
+
+  def test_media_smoke_attaches_media_and_closes_without_posting
+    browser = FakeBrowser.new
+    result = SnsMultipost::Mixi2Browser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).media_smoke("one.jpg")
+
+    assert_equal ["one.jpg"], browser.media_paths
+    assert_equal 1, result["previews"]
+    refute browser.instance_variable_get(:@submitted)
+    refute browser.quit_called
   end
 end

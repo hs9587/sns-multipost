@@ -7,6 +7,7 @@ module SnsMultipost
     MEDIA_SELECTOR = 'input[type="file"]'.freeze
     SUBMIT_SELECTOR = 'button[type="submit"][aria-label="送信"]'.freeze
     POST_BUTTON_XPATH = '//button[normalize-space(.)="ポスト"]'.freeze
+    MEDIA_SETTLE_SECONDS = 30
 
     STATE_JS = <<~'JS'.freeze
       (() => ({
@@ -56,10 +57,52 @@ module SnsMultipost
     POST_URL_JS = <<~'JS'.freeze
       (() => {
         const expected = arguments[0];
+        const excluded = new Set(arguments[1] || []);
         const article = Array.from(document.querySelectorAll('article'))
-          .find((candidate) => candidate.textContent.includes(expected));
+          .find((candidate) => {
+            if (!candidate.textContent.includes(expected)) return false;
+            const link = candidate.querySelector('a[href*="/posts/"]');
+            const url = link && new URL(link.getAttribute('href'), location.origin).href;
+            return url && !excluded.has(url);
+          });
         const link = article && article.querySelector('a[href*="/posts/"]');
         return link ? new URL(link.getAttribute('href'), location.origin).href : null;
+      })()
+    JS
+
+    ATTACHMENT_STATE_JS = <<~'JS'.freeze
+      (() => {
+        const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+        const dialog = dialogs.find((candidate) =>
+          candidate.getClientRects().length > 0 &&
+          candidate.querySelector('button[type="submit"][aria-label="送信"]') &&
+          candidate.querySelector('[contenteditable="true"]'));
+        if (!dialog) return { files: 0, previews: 0 };
+        const input = dialog.querySelector('input[type="file"]');
+        const previews = Array.from(dialog.querySelectorAll('img, video')).filter((media) => {
+          const rect = media.getBoundingClientRect();
+          return rect.width > 64 && rect.height > 64;
+        });
+        return {
+          files: input ? input.files.length : 0,
+          previews: previews.length,
+          previewSources: previews.map((media) => {
+            const source = media.currentSrc || media.src || '';
+            return source.startsWith('blob:') ? 'blob' :
+              source.startsWith('data:') ? 'data' :
+              source.startsWith('http') ? 'http' : 'other';
+          }),
+          busy: dialog.querySelectorAll('[aria-busy="true"], [data-loading="true"]').length,
+          editors: Array.from(dialog.querySelectorAll('[contenteditable="true"]'))
+            .map((node) => node.getClientRects().length > 0),
+          submits: Array.from(dialog.querySelectorAll('button[type="submit"]'))
+            .map((node) => node.getClientRects().length > 0),
+          inputs: Array.from(dialog.querySelectorAll('input[type="file"]')).map((node) => ({
+            accept: node.accept,
+            multiple: node.multiple,
+            parentVisible: !!node.parentElement && node.parentElement.getClientRects().length > 0
+          }))
+        };
       })()
     JS
 
@@ -74,7 +117,7 @@ module SnsMultipost
     end
 
     def smoke
-      state, composer = open_composer
+      state, composer, = open_composer
 
       raise "mixi2の投稿画面を閉じられません" unless browser.evaluate(CLOSE_COMPOSER_JS)
       composer.merge("url" => state["url"])
@@ -83,41 +126,53 @@ module SnsMultipost
     end
 
     def post(text:, media_paths: [])
-      open_composer
+      _, _, composer = open_composer
 
-      editor = browser.at_css(EDITOR_SELECTOR)
+      editor = composer.at_css(EDITOR_SELECTOR)
       raise "mixi2の本文欄が見つかりません" unless editor
       editor.click.type(text)
 
       unless media_paths.empty?
         media_paths.each do |path|
-          media = browser.at_css(MEDIA_SELECTOR)
-          raise "mixi2のメディア入力が見つかりません" unless media
-          baseline_connections = browser.network.pending_connections
-          media.select_file(path)
-          @sleeper.call(0.2)
-          idle = browser.network.wait_for_idle(
-            connections: baseline_connections,
-            duration: 0.1,
-            timeout: [@timeout * 2, 30].max)
-          raise "mixi2の画像アップロードが完了しません: #{path}" unless idle
-          @sleeper.call(1)
+          attach_media(composer, path)
         end
       end
 
       ready = wait_for { browser.evaluate(SUBMIT_READY_JS) }
       raise "mixi2の送信ボタンが有効になりません" unless ready
 
-      submit = browser.at_css(SUBMIT_SELECTOR)
+      existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40])
+
+      submit = composer.at_css(SUBMIT_SELECTOR)
       raise "mixi2の送信ボタンが見つかりません" unless submit
       submit.click
 
       closed = wait_for { !browser.evaluate(COMPOSER_JS)["opened"] }
       raise "mixi2の投稿完了を確認できません" unless closed
 
-      @sleeper.call(0.5)
-      url = browser.evaluate(POST_URL_JS, text[0, 40])
+      url = wait_for { browser.evaluate(POST_URL_JS, text[0, 40], existing_urls) }
+      raise "mixi2の新しい投稿を確認できません" unless url
       { posted: true, url: url }
+    ensure
+      browser.quit if @owns_browser && @browser
+    end
+
+    POST_URLS_JS = <<~'JS'.freeze
+      (() => {
+        const expected = arguments[0];
+        return Array.from(document.querySelectorAll('article'))
+          .filter((candidate) => candidate.textContent.includes(expected))
+          .map((candidate) => candidate.querySelector('a[href*="/posts/"]'))
+          .filter(Boolean)
+          .map((link) => new URL(link.getAttribute('href'), location.origin).href);
+      })()
+    JS
+
+    def media_smoke(media_path)
+      _, _, composer = open_composer
+      state = attach_media(composer, media_path)
+      raise "mixi2の投稿画面を閉じられません" unless browser.evaluate(CLOSE_COMPOSER_JS)
+      state
     ensure
       browser.quit if @owns_browser && @browser
     end
@@ -153,7 +208,45 @@ module SnsMultipost
       end
       raise "mixi2の投稿画面を確認できません: #{last_composer.inspect}" unless composer
 
-      [state, composer]
+      composer_node = wait_for { active_composer_node }
+      raise "mixi2の表示中投稿ダイアログを特定できません" unless composer_node
+
+      [state, composer, composer_node]
+    end
+
+    def active_composer_node
+      browser.css('[role="dialog"]').find do |candidate|
+        candidate.evaluate(<<~'JS')
+          this.getClientRects().length > 0 &&
+          !!this.querySelector('button[type="submit"][aria-label="送信"]') &&
+          !!this.querySelector('[contenteditable="true"]')
+        JS
+      rescue StandardError
+        false
+      end
+    end
+
+    def attach_media(composer, path)
+      before = browser.evaluate(ATTACHMENT_STATE_JS)
+      media = composer.at_css(MEDIA_SELECTOR)
+      raise "mixi2のメディア入力が見つかりません" unless media
+      baseline_connections = browser.network.pending_connections
+      media.select_file(path)
+      @sleeper.call(0.2)
+      attached = wait_for do
+        state = browser.evaluate(ATTACHMENT_STATE_JS)
+        state if state["previews"] > before["previews"]
+      end
+      raise "mixi2の画像プレビューを確認できません: #{path}" unless attached
+      idle = browser.network.wait_for_idle(
+        connections: baseline_connections,
+        duration: 0.1,
+        timeout: [@timeout * 2, 30].max)
+      raise "mixi2の画像アップロードが完了しません: #{path}" unless idle
+          # プレビューはローカルの blob URL ですぐ表示されるが、mixi2 側が
+          # 投稿用データとして画像を取り込むまで時間がかかることがある。
+          @sleeper.call(MEDIA_SETTLE_SECONDS)
+      attached
     end
 
     def browser
