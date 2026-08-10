@@ -17,6 +17,7 @@ class MediaTest < Minitest::Test
     assert_equal 1, SnsMultipost::Media.limit_for("mixi")
     assert_equal 4, SnsMultipost::Media.limit_for("fedibird")
     assert_equal 0, SnsMultipost::Media.limit_for("jotter")
+    assert_equal 20, SnsMultipost::Media.limit_for("threads")
   end
 
   def test_for_sns_truncates

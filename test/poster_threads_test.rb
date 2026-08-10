@@ -4,10 +4,25 @@ require "poster/threads"
 
 class PosterThreadsTest < Minitest::Test
   class FakeApi
-    attr_reader :text
+    attr_reader :text, :image_url, :image_urls, :method
     def create_text_post(text)
       @text = text
+      @method = :text
       { "id" => "777" }
+    end
+
+    def create_image_post(text:, image_url:)
+      @text = text
+      @image_url = image_url
+      @method = :image
+      { "id" => "778" }
+    end
+
+    def create_carousel_post(text:, image_urls:)
+      @text = text
+      @image_urls = image_urls
+      @method = :carousel
+      { "id" => "779" }
     end
   end
 
@@ -15,7 +30,7 @@ class PosterThreadsTest < Minitest::Test
     def create_text_post(_text) = {}
   end
 
-  Job = Struct.new(:sns, :text, :title, :media_paths, keyword_init: true)
+  Job = Struct.new(:sns, :text, :title, :media_paths, :media_urls, keyword_init: true)
 
   def config(dry_run: false)
     SnsMultipost::Config.new(
@@ -23,8 +38,31 @@ class PosterThreadsTest < Minitest::Test
       "threads" => { "access_token" => "TOK" })
   end
 
-  def job(text: "やあ")
-    Job.new(sns: "threads", text: text, title: nil, media_paths: [])
+  def job(text: "やあ", media_urls: [])
+    Job.new(sns: "threads", text: text, title: nil, media_paths: [], media_urls: media_urls)
+  end
+
+
+  def test_perform_posts_one_image_from_public_url
+    api = FakeApi.new
+    result = SnsMultipost::Poster::Threads.new(config, api: api).perform(
+      job(text: "写真", media_urls: ["https://media.example/one.jpg"]))
+
+    assert_equal :image, api.method
+    assert_equal "写真", api.text
+    assert_equal "https://media.example/one.jpg", api.image_url
+    assert_equal "778", result[:id]
+  end
+
+  def test_perform_posts_multiple_images_as_carousel
+    api = FakeApi.new
+    urls = (1..21).map { |i| "https://media.example/#{i}.jpg" }
+    result = SnsMultipost::Poster::Threads.new(config, api: api).perform(
+      job(text: "写真集", media_urls: urls))
+
+    assert_equal :carousel, api.method
+    assert_equal urls.first(20), api.image_urls
+    assert_equal "779", result[:id]
   end
 
   def test_perform_posts_text_and_returns_id

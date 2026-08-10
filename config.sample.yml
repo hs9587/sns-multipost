@@ -49,8 +49,8 @@ targets:
     - bluesky
     - tumblr
     - blogger
+    - threads
     - mixi
-    - jotter
   post:
     - fedibird
     - bluesky

@@ -81,13 +81,13 @@ sns-multipost/
 
 | 組 | SNS | 手段 |
 |----|-----|------|
-| API組 | Bluesky / Tumblr / Blogger / Fedibird / Threads | 各 REST API（HTTP+JSON、gem は最小限）。Threads は `bin/post` のテキストのみ |
+| API組 | Bluesky / Tumblr / Blogger / Fedibird / Threads | 各 REST API（HTTP+JSON、gem は最小限）。Threads はテキストと公開URLによる画像・カルーセル |
 | API組(保管) | X | API v2 + OAuth1.0a のコードと認証確認結果は残すが、クレジット購入予定がないため実運用には使わない |
 | ブラウザ組(稼働) | mixi2 | 専用ChromeプロファイルをFerrumで操作。テキスト・画像投稿の実投稿確認済み |
 | ブラウザ組(未実装) | Instagram / mixi旧 / Jotter.me / Facebook個人プロフィール | サービスごとのスパイクで操作特性と規約を確認する |
 
 - Xの公式Automation rulesはWebサイトのスクリプト操作を禁じているため、Xをブラウザ自動投稿しない。必要なら本文準備と公式Webを開くところまでの手動引き渡しにする
-- Instagram は画像付き投稿のハブ候補。写真なし投稿は Threads API へ直接投稿し、Facebook 個人プロフィールはブラウザ投稿で追加する
+- Instagramは非公開個人アカウントを維持する。Threadsは公式APIでテキスト・画像を投稿し、Facebook個人プロフィールは手動引き渡し候補とする
 - ブラウザ組は失敗時にスクリーンショットを failed/ のジョブ横に保存（Claude 修理の一次資料）
 - Jotter.me は **v1 テキスト投稿のみ**。セーブポイント URL を毎回開き、同一ブラウザプロセス内で投稿する。画像投稿には DEN が必要なためスコープ外
 - mixi2は専用Chromeプロファイル、Ferrum、最大150文字・画像4枚で実装し、キュー経由の実投稿まで確認済み

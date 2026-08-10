@@ -6,12 +6,12 @@
 旧 [SNS_multi_post](https://github.com/hs9587/SNS_multi_post)（Ruby+Selenium 世代）の後継として、
 「トリガ → ファイルキュー → 投稿実行」を分離した構成で作り直している。
 
-## 現在の状態（2026-08-09）
+## 現在の状態（2026-08-11）
 
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
 - X は OAuth1.0a 認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
-- Threads は公式APIによる `bin/post` からのテキスト投稿、OAuth、長期トークン保存まで稼働確認済み
+- Threads は公式APIによるテキスト投稿が稼働済み。Fedibirdの公開画像URLを使う単画像・カルーセル投稿を実装し、実投稿確認待ち
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
@@ -33,7 +33,7 @@
 | mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chromeから実投稿確認済み。本文150文字・画像4枚 |
 | Jotter.me | 稼働 | セーブポイントを素のChromeで復元後に自動操作を接続。公開テキスト投稿・URL確認済み |
-| Threads | 稼働 | `bin/post` のテキスト投稿のみ。長期トークンを自動更新 |
+| Threads | 画像実装・確認待ち | テキスト投稿は稼働済み。公開URLによる画像1枚・最大20枚のカルーセルに対応 |
 | Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
 
 ## 主な要件
@@ -77,13 +77,14 @@
 
 ## ロードマップ
 
-1. Threadsの画像投稿に対応
-2. Blogger画像の恒久置き場が必要かを、Threads画像対応の方式も踏まえて判断
+1. Threadsの単画像・複数画像投稿を実投稿確認
+2. ThreadsもFedibirdの公開画像URLを利用するため、Bloggerと共通の恒久置き場が必要かを判断
 3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
 Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
-Blogger側へ自動的に複製されてはいなかった。恒久置き場は直ちに実装せず、Threads画像対応後に要否を判断する。
+Blogger側へ自動的に複製されてはいなかった。Threads画像も同じ公開URLをMeta側が取得する方式のため、
+Fedibird画像の保持期間と運用上の必要性を踏まえて、共通の恒久置き場の要否を判断する。
 
 ## 保存容量と清掃
 

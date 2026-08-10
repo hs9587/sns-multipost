@@ -81,7 +81,7 @@ class WatchTest < Minitest::Test
           "media_attachments" => [{ "url" => "https://media.example/a.jpg" },
                                   { "url" => "https://media.example/b.jpg" }] },
       ]
-      watch, queue = build_watch(dir, statuses: statuses, targets: %w[bluesky])
+      watch, queue = build_watch(dir, statuses: statuses, targets: %w[threads])
       File.write(File.join(dir, "since_id.txt"), "0")
       watch.run
       job = queue.pending.first
