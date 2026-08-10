@@ -4,23 +4,31 @@ require "time"
 require "cli"
 require "config"
 require "job_queue"
+require "manual_post"
 require "poster/all"
 require "title_rules"
 
 target = nil
+images = []
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/post [options] [TEXT...]",
-  description: "sns-multipostへ本文を手動投入し、設定された全投稿先のジョブをqueue/に作成します。\nTEXTを省略した場合、本文は「おはようございます」になります。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
+  description: "sns-multipostへ本文と任意のローカル画像を手動投入し、queue/に投稿ジョブを作成します。\nTEXTを省略した場合、本文は「おはようございます」になります。\nジョブ作成後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
   examples: ["ruby bin/post",
              'ruby bin/post --target jotter "Jotter ブラウザ投稿テスト"',
+             'ruby bin/post --image photo.jpg "画像付き投稿"',
+             'ruby bin/post --target bluesky --image one.jpg --image two.jpg "二枚"',
              'ruby bin/post "任意の本文"',
              'ruby bin/post -- "-から始まる本文"'],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
-          "--targetを省略するとtargets.postの全投稿先へ、指定するとそのSNSだけへキューを作ります。",
-          "Fedibird監視を経由しない、写真なしの手動投稿に使います。"]
+          "画像なしで--targetを省略するとtargets.postの全投稿先へ、指定するとそのSNSだけへキューを作ります。",
+          "--imageは複数指定できます。Bluesky、Tumblr、mixi、mixi2のジョブだけを作ります。",
+          "画像は絶対パスに直してキューへ保存するため、run_queue完了まで移動・削除しないでください。"]
 ) do |opts|
   opts.on("-t", "--target SNS", "指定した1つのSNSだけをキューへ入れる") do |value|
     target = value.to_s.downcase
+  end
+  opts.on("-i", "--image PATH", "ローカル画像を添付（複数指定可）") do |value|
+    images << value
   end
 end
 SnsMultipost::Cli.parse!(parser)
@@ -34,10 +42,20 @@ config = SnsMultipost::Config.load
 queue = SnsMultipost::JobQueue.new
 title = SnsMultipost::TitleRules.load.title_for(text)
 
-targets = target ? [target] : config.targets_for(:post)
+begin
+  image_paths = SnsMultipost::ManualPost.resolve_image_paths(images)
+  targets, skipped = SnsMultipost::ManualPost.select_targets(
+    configured: config.targets_for(:post), target: target,
+    with_images: !image_paths.empty?)
+rescue ArgumentError => e
+  SnsMultipost::Cli.usage_error(parser, e.message)
+end
+warn "画像非対応のためキューを作らない投稿先: #{skipped.join(', ')}" unless skipped.empty?
+
 targets.each do |sns|
   path = queue.enqueue(SnsMultipost::Job.new(
-    sns: sns, text: text, title: title, created_at: Time.now.iso8601))
+    sns: sns, text: text, title: title, media_paths: image_paths,
+    created_at: Time.now.iso8601))
   puts "queued: #{path}"
 end
 puts "次: ruby bin/run_queue"

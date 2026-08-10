@@ -11,7 +11,7 @@
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
 - X は OAuth1.0a 認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
-- Threads は公式APIによるテキスト投稿が稼働済み。Fedibirdの公開画像URLを使う単画像・カルーセル投稿を実装し、実投稿確認待ち
+- Threads は公式APIによるテキスト投稿が稼働済み。画像APIコードは実装したが、Instagramからの波及方法と恒久画像置き場を決めるまで実地テストを保留
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
@@ -33,7 +33,7 @@
 | mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chromeから実投稿確認済み。本文150文字・画像4枚 |
 | Jotter.me | 稼働 | セーブポイントを素のChromeで復元後に自動操作を接続。公開テキスト投稿・URL確認済み |
-| Threads | 画像実装・確認待ち | テキスト投稿は稼働済み。公開URLによる画像1枚・最大20枚のカルーセルに対応 |
+| Threads | テキスト稼働・画像保留 | 画像APIコードはあるが実地テスト未実施。Instagram連携と恒久画像置き場の決定後に再検討 |
 | Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
 
 ## 主な要件
@@ -51,6 +51,8 @@
     ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
     ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
     ruby bin/post --target jotter "本文" # 指定した1 SNSだけのキューを生成
+    ruby bin/post --image photo.jpg "本文" # ローカル画像対応4 SNSの画像付きキューを生成
+    ruby bin/post --target bluesky --image one.jpg --image two.jpg "本文"
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
     ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める
@@ -77,14 +79,15 @@
 
 ## ロードマップ
 
-1. Threadsの単画像・複数画像投稿を実投稿確認
-2. ThreadsもFedibirdの公開画像URLを利用するため、Bloggerと共通の恒久置き場が必要かを判断
+1. `bin/post --image` によるBluesky / Tumblr / mixi / mixi2投稿を実地確認
+2. BloggerとThreadsで共通利用できる恒久画像置き場と、InstagramからThreadsへの波及方法を検討
 3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
 Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
-Blogger側へ自動的に複製されてはいなかった。Threads画像も同じ公開URLをMeta側が取得する方式のため、
-Fedibird画像の保持期間と運用上の必要性を踏まえて、共通の恒久置き場の要否を判断する。
+Blogger側へ自動的に複製されてはいなかった。Threads画像APIもMeta側から取得できる公開URLを必要とする。
+Threads画像はInstagramからの波及を想定しているため現段階では実地テストせず、恒久画像置き場と
+Instagram連携の方針を決めた後に再検討する。
 
 ## 保存容量と清掃
 

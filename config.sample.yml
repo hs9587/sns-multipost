@@ -49,7 +49,6 @@ targets:
     - bluesky
     - tumblr
     - blogger
-    - threads
     - mixi
   post:
     - fedibird

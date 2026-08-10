@@ -103,6 +103,8 @@ class CliHelpTest < Minitest::Test
     assert status.success?
     assert_includes stdout, "Usage: ruby bin/post [options] [TEXT...]"
     assert_includes stdout, "--target SNS"
+    assert_includes stdout, "--image PATH"
+    assert_includes stdout, "Bluesky、Tumblr、mixi、mixi2"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
     assert_includes stdout, "ruby bin/post"
   end
