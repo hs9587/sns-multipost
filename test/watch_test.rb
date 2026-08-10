@@ -74,6 +74,22 @@ class WatchTest < Minitest::Test
     end
   end
 
+  def test_self_posted_status_is_not_requeued_but_advances_state
+    Dir.mktmpdir do |dir|
+      statuses = [
+        { "id" => "4", "content" => "<p>bin/postからの投稿</p>",
+          "url" => "u4", "media_attachments" => [] },
+      ]
+      watch, queue = build_watch(dir, statuses: statuses)
+      File.write(File.join(dir, "since_id.txt"), "3")
+
+      watch.run
+
+      assert_empty queue.pending
+      assert_equal "4", File.read(File.join(dir, "since_id.txt"))
+    end
+  end
+
   def test_threads_media_urls_into_jobs
     Dir.mktmpdir do |dir|
       statuses = [

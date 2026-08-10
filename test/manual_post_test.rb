@@ -19,13 +19,13 @@ class ManualPostTest < Minitest::Test
     assert_match(/画像ファイルが見つかりません/, error.message)
   end
 
-  def test_image_post_selects_only_four_local_image_targets
+  def test_image_post_selects_only_five_local_image_targets
     selected, skipped = SnsMultipost::ManualPost.select_targets(
       configured: %w[fedibird bluesky tumblr blogger threads mixi mixi2 jotter],
       target: nil, with_images: true)
 
-    assert_equal %w[bluesky tumblr mixi mixi2], selected
-    assert_equal %w[fedibird blogger threads jotter], skipped
+    assert_equal %w[fedibird bluesky tumblr mixi mixi2], selected
+    assert_equal %w[blogger threads jotter], skipped
   end
 
   def test_explicit_unsupported_image_target_raises

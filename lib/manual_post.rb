@@ -1,6 +1,6 @@
 module SnsMultipost
   module ManualPost
-    LOCAL_IMAGE_TARGETS = %w[bluesky tumblr mixi mixi2].freeze
+    LOCAL_IMAGE_TARGETS = %w[fedibird bluesky tumblr mixi mixi2].freeze
 
     def self.resolve_image_paths(paths, base_dir: Dir.pwd)
       Array(paths).map do |path|

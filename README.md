@@ -51,7 +51,8 @@
     ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
     ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
     ruby bin/post --target jotter "本文" # 指定した1 SNSだけのキューを生成
-    ruby bin/post --image photo.jpg "本文" # ローカル画像対応4 SNSの画像付きキューを生成
+    ruby bin/post --image photo.jpg "本文" # ローカル画像対応5 SNSの画像付きキューを生成
+    ruby bin/post --target fedibird --image photo.jpg "本文"
     ruby bin/post --target bluesky --image one.jpg --image two.jpg "本文"
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
@@ -75,11 +76,13 @@
 設定構造は `config.sample.yml` を参照し、実際の秘密値は Git 管理外の `config.yml` に利用者本人が記入する。
 投稿先は `targets.watch`（Fedibird新着からの展開）と `targets.post`（`bin/post` の手動投入）へ
 別々に列挙するため、入口ごとに投稿先を選べる。
+`bin/post` からFedibirdへ投稿した場合は、成功した投稿IDを `state/self_posted.txt` に記録する。
+次の `watch` はその投稿を自己投稿として除外し、他SNSへ重複展開せずに監視基準だけ先へ進める。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ
 
-1. `bin/post --image` によるBluesky / Tumblr / mixi / mixi2投稿を実地確認
+1. `bin/post --image` によるFedibird / Bluesky / Tumblr / mixi / mixi2投稿を実地確認
 2. BloggerとThreadsで共通利用できる恒久画像置き場と、InstagramからThreadsへの波及方法を検討
 3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討

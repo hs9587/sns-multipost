@@ -16,12 +16,13 @@ parser = SnsMultipost::Cli.parser(
   examples: ["ruby bin/post",
              'ruby bin/post --target jotter "Jotter ブラウザ投稿テスト"',
              'ruby bin/post --image photo.jpg "画像付き投稿"',
+             'ruby bin/post --target fedibird --image photo.jpg "Fedibird画像投稿"',
              'ruby bin/post --target bluesky --image one.jpg --image two.jpg "二枚"',
              'ruby bin/post "任意の本文"',
              'ruby bin/post -- "-から始まる本文"'],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
           "画像なしで--targetを省略するとtargets.postの全投稿先へ、指定するとそのSNSだけへキューを作ります。",
-          "--imageは複数指定できます。Bluesky、Tumblr、mixi、mixi2のジョブだけを作ります。",
+          "--imageは複数指定できます。Fedibird、Bluesky、Tumblr、mixi、mixi2のジョブだけを作ります。",
           "画像は絶対パスに直してキューへ保存するため、run_queue完了まで移動・削除しないでください。"]
 ) do |opts|
   opts.on("-t", "--target SNS", "指定した1つのSNSだけをキューへ入れる") do |value|
