@@ -6,36 +6,6 @@
 旧 [SNS_multi_post](https://github.com/hs9587/SNS_multi_post)（Ruby+Selenium 世代）の後継として、
 「トリガ → ファイルキュー → 投稿実行」を分離した構成で作り直している。
 
-## 現在の状態（2026-08-11）
-
-- Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
-- Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
-- X は OAuth1.0a 認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
-- Threads は公式APIによるテキスト投稿と、Fedibird最新画像URLを使う単画像投稿を実地確認済み。カルーセルは自動テスト済み
-- Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
-- Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
-- Windows タスクスケジューラによる定期実行は稼働実績あり
-- タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
-- Phase 3はmixi2ポスト、mixiつぶやき、Jotter.me公開テキスト投稿を実投稿確認済み
-
-テストは `bundle exec rake test` で実行する。
-
-## 投稿先
-
-| SNS | 状態 | 手段・留意点 |
-|-----|------|--------------|
-| Fedibird | 稼働 | きっかけ投稿兼用。手動投入時は投稿先にもなる |
-| Bluesky | 稼働 | AT Protocol。画像対応 |
-| Tumblr | 稼働 | OAuth2。トークン自動更新、画像対応 |
-| Blogger | 稼働 | 本文はGoogle OAuth2 API、画像は専用ChromeでBlogger内部ストアへ保存。統合後の実投稿確認待ち |
-| X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
-| Instagram | 手動引き渡し予定 | 既存の非公開個人アカウントを維持。プロアカウント化とブラウザ自動化は行わない |
-| mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
-| mixi2 | 稼働 | 専用Chromeから実投稿確認済み。本文150文字・画像4枚 |
-| Jotter.me | 稼働 | セーブポイントを素のChromeで復元後に自動操作を接続。公開テキスト投稿・URL確認済み |
-| Threads | 稼働・画像運用は再検討 | テキストと単画像を実投稿確認済み。カルーセルは自動テスト済み。Instagramからの波及方法は今後検討 |
-| Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
-
 ## 主な要件
 
 - 入口は Fedibird。きっかけ投稿がそのまま Fedibird 投稿を兼ねる
@@ -46,34 +16,77 @@
 - 認証情報とブラウザ状態は Git に入れない
 - 基本実装は Ruby。ブラウザ操作ライブラリは対象サービスごとの実証結果で決める
 
-## 使い方
+## 現在の状態（2026-08-11）
 
-    ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
-    ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
-    ruby bin/post --target jotter "本文" # 指定した1 SNSだけのキューを生成
-    ruby bin/post --image photo.jpg "本文" # ローカル画像対応6 SNSの画像付きキューを生成
-    ruby bin/post --target fedibird --image photo.jpg "本文"
-    ruby bin/post --target bluesky --image one.jpg --image two.jpg "本文"
-    ruby bin/post --target threads --target blogger --from-fedibird-latest
-    ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
-    ruby bin/watch                # Fedibird 新着検出 → キュー生成
-    ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める
-    ruby bin/watch --rewind 1     # キューを作らず監視基準を1件戻す
-    ruby bin/retry failed/x.json  # 失敗ジョブを再実行
-    ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
-    ruby bin/threads_auth --help  # Threads API の初回OAuth認証
-    ruby bin/browser_login mixi   # mixiブラウザ投稿専用Chromeで初回ログイン
-    ruby bin/mixi_smoke           # 投稿せずmixiログインとつぶやきフォームを確認
-    ruby bin/browser_login mixi2  # ブラウザ投稿専用Chromeで初回ログイン
-    ruby bin/mixi2_smoke          # 投稿せずmixi2ログインと投稿画面を確認
-    ruby bin/jotter_smoke         # 投稿せずJotterログイン、本人、投稿フォーム、公開範囲を確認
-    ruby bin/whoami               # Fedibird の account_id 確認
+- Fedibird監視、ファイルキュー、投稿実行、失敗ジョブの再試行からなる基盤は実装・運用確認済み
+- Fedibird / Bluesky / Tumblr / Threads はAPIによる実投稿を確認済み
+- Bloggerは本文のAPI投稿と、専用Chromeによる内部画像ストア保存を組み合わせた画像付き実投稿を確認済み
+- mixi2ポスト、mixiつぶやき、Jotter.me公開テキスト投稿は専用Chromeによる実投稿を確認済み
+- Threadsはテキストと単画像を実投稿確認済み。複数画像を1件にまとめる投稿は実装・自動テスト済みだが、実投稿は未確認
+- Tumblrの短命トークンとローテーション型refresh tokenは自動更新・永続化済み
+- Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり
+- タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
+- XはOAuth 1.0a認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
+
+テストは `bundle exec rake test` で実行する。
+
+## 投稿先
+
+| SNS | 状態 | 手段・留意点 |
+|-----|------|--------------|
+| Fedibird | 稼働 | API。きっかけ投稿兼用。手動投入時は投稿先にもなる |
+| Bluesky | 稼働 | AT Protocol。画像対応 |
+| Tumblr | 稼働 | OAuth2 API。トークン自動更新、画像対応 |
+| Threads | 稼働・画像運用は再検討 | 公式API。テキストと単画像は実投稿確認済み。複数画像投稿は自動テスト済み |
+| Blogger | 稼働 | 混合方式。本文はGoogle OAuth2 API、画像だけ専用ChromeでBlogger内部ストアへ保存 |
+| mixi | 稼働 | 専用Chrome。つぶやき、本文150文字・画像1枚 |
+| mixi2 | 稼働 | 専用Chrome。本文150文字・画像4枚 |
+| Jotter.me | 稼働 | 専用Chrome。セーブポイント復元後に接続し、公開テキスト投稿とURLを確認 |
+| X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
+| Instagram | 手動引き渡し予定 | 非公開個人アカウントを維持。プロアカウント化とブラウザ自動化は行わない |
+| Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
+
+## 使い方
 
 全コマンドで `-h` / `--help` を利用できる。オプション、引数、実投稿に関する注意は
 各コマンドのヘルプで確認する。
 
     ruby bin/watch --help
+    ruby bin/post --help
     ruby bin/run_queue --help
+
+典型的な使い方は次の3通り。
+
+1. `targets.post` の投稿先へ「おはようございます」を投稿する
+
+       ruby bin/post
+       ruby bin/run_queue
+
+2. `targets.post` のうちローカル画像対応の投稿先へ、本文と画像を投稿する
+
+       ruby bin/post --image photo.jpg "本文"
+       ruby bin/run_queue
+
+3. Fedibirdの新着を検出し、`targets.watch` の投稿先へ展開する
+
+       ruby bin/watch
+       ruby bin/run_queue
+
+3番目はWindowsタスクスケジューラで定期実行できる。常時稼働の設定は [SETUP.md](SETUP.md) を参照。
+
+投稿先の限定、監視基準の調整、失敗ジョブの再試行などは各コマンドのヘルプで確認する。
+
+    ruby bin/post --target jotter "本文"
+    ruby bin/watch --sync-only
+    ruby bin/watch --rewind 1
+    ruby bin/retry failed/x.json
+    ruby bin/dryrun_titles 200
+    ruby bin/threads_auth --help
+    ruby bin/browser_login blogger
+    ruby bin/mixi_smoke
+    ruby bin/mixi2_smoke
+    ruby bin/jotter_smoke
+    ruby bin/whoami
 
 設定構造は `config.sample.yml` を参照し、実際の秘密値は Git 管理外の `config.yml` に利用者本人が記入する。
 投稿先は `targets.watch`（Fedibird新着からの展開）と `targets.post`（`bin/post` の手動投入）へ
@@ -85,33 +98,33 @@
 したがって `bin/post` 由来の自己投稿や返信は、巻き戻しても再配信されない。失敗ジョブの再実行には
 監視基準を戻さず `bin/retry` を使う。
 
-ローカル画像を投稿可能な全投稿先へ手動展開する場合は、処理を2段階に分ける。最初の `--image` は
-Fedibird / Bluesky / Tumblr / mixi / mixi2だけのジョブを作り、1回目の `run_queue` でFedibirdにも
-公開画像を作る。その後 `--from-fedibird-latest` が自分の最新Fedibird投稿から本文と画像URLを読み、
-Threads / Bloggerだけのジョブを作る。
+ローカル画像を投稿可能な全投稿先へ手動展開する場合、`--image` は `targets.post` のうち
+Fedibird / Bluesky / Tumblr / Blogger / mixi / mixi2のジョブを作る。
+ThreadsはMetaが取得できる公開画像URLを必要とするため、
+Fedibird投稿後に `--from-fedibird-latest` でThreadsジョブを追加する。
 
     ruby bin/post --image photo.jpg "本文"
     ruby bin/run_queue
-    ruby bin/post --target threads --target blogger --from-fedibird-latest
+    ruby bin/post --target threads --from-fedibird-latest
     ruby bin/run_queue
 
 `--from-fedibird-latest` は選択したFedibird投稿URLと画像枚数を表示し、最新投稿に画像がなければ
-ジョブを作らない。BloggerはFedibird画像を一度ローカルへ取得し、専用Chromeで
+ジョブを作らない。Bloggerを明示的に選んだ場合はFedibird画像を一度ローカルへ取得し、専用Chromeで
 `blogger.googleusercontent.com` へ保存してから本文へ埋め込む。
-Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの二段階経路でThreadsと
-Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿を削除した。Instagramからの本来の
+Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの経路でThreadsと
+Bloggerの単画像投稿を実地確認した。Instagramからの本来の
 波及方法を決めた後に、Threads画像の実運用経路は再検討する。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ
 
-1. Blogger内部画像ストア統合後の実投稿を確認
-2. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
-3. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
+1. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃など、安全性と安定性を高める
+2. Threads画像の実運用経路と、複数画像投稿の実地確認を再検討する
+3. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
 
 従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
 されなかった。このため、現在はBlogger API投稿の前に専用Chromeで内部画像ストアへ保存する。
-Instagram連携とThreads画像の実運用経路は、Blogger統合の実投稿確認後に再検討する。
+Instagram連携とThreads画像の実運用経路は今後再検討する。
 
 Blogger編集画面の「パソコンからアップロード」を自動操作する小規模実証では、ローカルPNGを
 `blogger.googleusercontent.com` へ保存し、Chromeを閉じた後も下書きで表示できた。
@@ -133,7 +146,7 @@ Blogger編集画面の「パソコンからアップロード」を自動操作�
 失敗ジョブ本体は、再実行や原因調査が済むまで自動削除しない。
 
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
-Phase 2 の実装結果は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、
+API投稿先の実装記録は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、
 Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-threads-api.md)、
-Phase 3の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
+ブラウザ投稿先の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

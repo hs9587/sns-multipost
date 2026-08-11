@@ -10,6 +10,8 @@ parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/run_queue [options]",
   description: "sns-multipostのqueue/にあるジョブを処理し、各SNSへ投稿します。\n通常は先に ruby bin/watch を実行し、Fedibirdの新着からジョブを作成します。",
   notes: ["bin/postで手動作成したジョブも処理します。",
+          "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
+          "Blogger画像には事前の browser_login blogger と、Chromeを操作できるログオン中の実行環境が必要です。",
           "dry_run: false の場合は実投稿します。",
           "dry_run: true でも処理したジョブは done/ へ移動します。"])
 SnsMultipost::Cli.parse!(parser)

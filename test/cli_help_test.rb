@@ -54,6 +54,8 @@ class CliHelpTest < Minitest::Test
     stdout, _stderr, status = run_cli("run_queue", "--help")
     assert status.success?
     assert_includes stdout, "先に ruby bin/watch"
+    assert_includes stdout, "Bloggerは本文をAPI投稿"
+    assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
   end
 
   def test_dryrun_titles_help_explains_dictionary_check_without_posting
@@ -120,6 +122,8 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "--from-fedibird-latest"
     assert_includes stdout, "Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2"
     assert_includes stdout, "Threads、Blogger"
+    assert_includes stdout, "Bloggerは本文をAPI投稿"
+    assert_includes stdout, "ruby bin/browser_login blogger"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
     assert_includes stdout, "ruby bin/post"
   end

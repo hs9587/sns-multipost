@@ -27,6 +27,8 @@ parser = SnsMultipost::Cli.parser(
           "--targetは複数指定できます。省略時は用途に応じてtargets.postから投稿先を選びます。",
           "--imageは複数指定できます。Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2のジョブだけを作ります。",
           "--from-fedibird-latestは最新Fedibird投稿の本文と画像URLをThreads、Bloggerへ渡します。",
+          "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
+          "Blogger画像を初めて使う前に ruby bin/browser_login blogger で専用Chromeへログインしてください。",
           "画像は絶対パスに直してキューへ保存するため、run_queue完了まで移動・削除しないでください。"]
 ) do |opts|
   opts.on("-t", "--target SNS", "指定SNSだけをキューへ入れる（複数指定可）") do |value|

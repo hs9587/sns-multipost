@@ -1,4 +1,4 @@
-# Blogger画像ストア実証
+# Blogger画像ストア実証と実装
 
 ## 結論
 
@@ -39,4 +39,15 @@ ruby spike/blogger_image_upload.rb PATH_TO_IMAGE
 - プロセス中断に備えて一時下書きIDも同ファイルへ先に保存し、次回画像投稿時に削除する。
 - ブラウザ操作失敗時は対応する `failed/*.png` を保存する。
 
-実装後の自動テストは完了。実際のBlogger画像付き投稿による最終確認は未実施。
+## 通常投稿の実地確認
+
+2026-08-11に `post --target blogger --from-fedibird-latest` で作ったジョブを
+`run_queue` から実行し、次を確認した。
+
+- Blogger公開記事へ画像付きで投稿できた。
+- 記事の画像は `blogger.googleusercontent.com` の `/s0/` URLになった。
+- 画像URLは認証なしでHTTP 200、`Content-Type: image/png` を返した。
+- 作業用下書きは処理後に削除され、キャッシュへ画像URLが保存された。
+- 最初のブラウザクリック失敗は画面保存から原因を特定し、再試行で正常終了した。
+
+自動テストと実際のBlogger画像付き投稿による最終確認は完了している。
