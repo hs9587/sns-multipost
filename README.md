@@ -27,7 +27,7 @@
 | Fedibird | 稼働 | きっかけ投稿兼用。手動投入時は投稿先にもなる |
 | Bluesky | 稼働 | AT Protocol。画像対応 |
 | Tumblr | 稼働 | OAuth2。トークン自動更新、画像対応 |
-| Blogger | 稼働 | Google OAuth2。公開後の記事本文も Fedibird の画像 URL をホットリンク |
+| Blogger | 稼働 | 本文はGoogle OAuth2 API、画像は専用ChromeでBlogger内部ストアへ保存。統合後の実投稿確認待ち |
 | X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
 | Instagram | 手動引き渡し予定 | 既存の非公開個人アカウントを維持。プロアカウント化とブラウザ自動化は行わない |
 | mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
@@ -51,7 +51,7 @@
     ruby bin/post                 # 「おはようございます」で手動投稿キューを生成
     ruby bin/post "本文"          # 任意の本文で手動投稿キューを生成
     ruby bin/post --target jotter "本文" # 指定した1 SNSだけのキューを生成
-    ruby bin/post --image photo.jpg "本文" # ローカル画像対応5 SNSの画像付きキューを生成
+    ruby bin/post --image photo.jpg "本文" # ローカル画像対応6 SNSの画像付きキューを生成
     ruby bin/post --target fedibird --image photo.jpg "本文"
     ruby bin/post --target bluesky --image one.jpg --image two.jpg "本文"
     ruby bin/post --target threads --target blogger --from-fedibird-latest
@@ -96,8 +96,8 @@ Threads / Bloggerだけのジョブを作る。
     ruby bin/run_queue
 
 `--from-fedibird-latest` は選択したFedibird投稿URLと画像枚数を表示し、最新投稿に画像がなければ
-ジョブを作らない。現在のBlogger通常投稿はFedibird画像を継続的にホットリンクする。
-Blogger内部画像ストアへのブラウザアップロードは実証済みだが、通常投稿への接続は未実装。
+ジョブを作らない。BloggerはFedibird画像を一度ローカルへ取得し、専用Chromeで
+`blogger.googleusercontent.com` へ保存してから本文へ埋め込む。
 Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの二段階経路でThreadsと
 Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿を削除した。Instagramからの本来の
 波及方法を決めた後に、Threads画像の実運用経路は再検討する。
@@ -105,19 +105,22 @@ Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿�
 
 ## ロードマップ
 
-1. 実証済みのBlogger画像ストアへのブラウザアップロードを、既存のBlogger API投稿へ安全に接続
+1. Blogger内部画像ストア統合後の実投稿を確認
 2. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 3. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
-Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
-Blogger側へ自動的に複製されてはいなかった。Threads画像APIもMeta側から取得できる公開URLを必要とする。
-Fedibird最新画像を使うThreads単画像投稿は成功したが、Bloggerは画像をホットリンクし続ける。
-Blogger内部画像ストアを通常投稿へ接続した後、Instagram連携とThreads画像の実運用経路を再検討する。
+従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
+されなかった。このため、現在はBlogger API投稿の前に専用Chromeで内部画像ストアへ保存する。
+Instagram連携とThreads画像の実運用経路は、Blogger統合の実投稿確認後に再検討する。
 
 Blogger編集画面の「パソコンからアップロード」を自動操作する小規模実証では、ローカルPNGを
 `blogger.googleusercontent.com` へ保存し、Chromeを閉じた後も下書きで表示できた。
 表示用URLの `/s320/` を `/s0/` に変更した元サイズURLも、認証なしでHTTP 200を確認した。
 詳細と再現手順は `docs/specs/2026-08-11-blogger-image-store.md` を参照。
+
+通常投稿ではAPIで非公開の一時下書きを作り、画像URL取得後にその下書きをAPIで削除する。
+取得済みURLは `state/blogger_image_store.json` に保存し、再試行時の重複アップロードを抑える。
+画像付き投稿の前に一度 `ruby bin/browser_login blogger` を実行して専用Chromeへログインしておく。
 
 ## 保存容量と清掃
 

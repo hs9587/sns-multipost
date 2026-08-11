@@ -44,4 +44,23 @@ class BloggerApiTest < Minitest::Test
     err = assert_raises(RuntimeError) { api.insert_post(title: "t", html: "<p>x</p>") }
     assert_match(/Blogger API error 403/, err.message)
   end
+
+  def test_insert_draft_adds_query_parameter
+    t, calls = fake([[200, JSON.generate("id" => "99")]])
+    api = SnsMultipost::BloggerApi.new(blog_id: "42", access_token: "AT", transport: t)
+
+    api.insert_post(title: "scratch", html: "", is_draft: true)
+
+    assert_equal "/blogger/v3/blogs/42/posts?isDraft=true", calls.first[:path]
+  end
+
+  def test_delete_post_accepts_empty_success_and_not_found
+    t, calls = fake([[204, ""], [404, '{"error":"missing"}']])
+    api = SnsMultipost::BloggerApi.new(blog_id: "42", access_token: "AT", transport: t)
+
+    assert api.delete_post("99")
+    assert api.delete_post("already-gone")
+    assert_equal "DELETE", calls.first[:method]
+    assert_equal "/blogger/v3/blogs/42/posts/99", calls.first[:path]
+  end
 end

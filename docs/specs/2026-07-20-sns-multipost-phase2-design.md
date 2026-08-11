@@ -36,12 +36,13 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 ## 4. 各ポスターの投稿と画像
 
 画像入りで実装する。Bluesky / Tumblr / X は watch がダウンロードしたローカルファイル
-（ジョブの `media_paths`）を使う。Blogger は元画像 URL（`media_urls`）を使う。
+（ジョブの `media_paths`）を使う。Bloggerもローカル画像を優先し、ない場合は `media_urls` から
+一時取得してBlogger内部画像ストアへアップロードする。
 `Media.for_sns` で SNS 別の枚数上限に切り詰める。
 
 - **Bluesky**: `com.atproto.repo.uploadBlob` で画像を上げ、`app.bsky.feed.post` レコードに embed（images）。テキスト上限 300 grapheme、画像4枚・2MB/枚
 - **Tumblr**: `POST /v2/blog/{blog_identifier}/posts`（NPF: Neue Post Format）でテキストブロック＋画像ブロック。テキスト緩め、画像10枚
-- **Blogger**: Blogger API v3 に画像アップロード口がないため、Fedibird の元画像 URL を本文 HTML に `<img>` でホットリンクして `posts.insert`。**タイトル必須**なので title_rules の導出タイトルを使う（本文の改行は `<br>`/`<p>` へ）
+- **Blogger**: Blogger API v3 に画像アップロード口がないため、専用Chromeで非公開の一時下書きへ画像を挿入し、取得した `blogger.googleusercontent.com` URLを本文HTMLへ埋め込んで `posts.insert`。一時下書きはAPIで削除する。**タイトル必須**なので title_rules の導出タイトルを使う（本文の改行は `<br>`/`<p>` へ）
 - **X**: OAuth1.0a 署名付き `POST /2/media/upload` で画像 → `POST /2/tweets` に `media.media_ids`。`media_category=tweet_image` 必須。テキスト上限 280、画像4枚・約5MB/枚
 
 各ポスターは Phase 1 の Fedibird 同様、非2xx で `RuntimeError`（ステータス＋本文先頭200字）、成功時に投稿 URL/id を返す。テストは injected transport lambda で実ネットワークなし。
@@ -73,12 +74,12 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 
 - **X の課金**: Pay Per Use のクレジットは購入しない。OAuth1.0a実装は保管し、実運用はPhase 3のブラウザ投稿とする
 - **Tumblr の token rotation**: 最新 refresh token は `state/tumblr_token.json` にしかない場合がある。失った場合はOAuth認可をやり直す
-- **Blogger の画像**: 通常投稿は現在も Fedibird 画像のホットリンク。Blogger内部画像ストアへのブラウザアップロードと恒久URL取得は2026-08-11に実証済みだが、既存のAPI投稿への接続は未実装
+- **Blogger の画像**: 内部画像ストアへのブラウザアップロードを既存API投稿へ接続済み。画像URLキャッシュと未削除の一時下書きIDを原子的に保存し、次回画像投稿時に回収する。統合後の実投稿確認待ち
 
 ## 9. 実装結果（2026-08-04）
 
 - Phase 2a Bluesky: 実装・画像付き実投稿完了
 - Phase 2b Tumblr: NPF multipart のバイナリ安全化、レスポンス形式修正、トークン自動更新まで完了
-- Phase 2c Blogger: OAuth refresh、HTML本文、画像ホットリンク、実投稿完了
+- Phase 2c Blogger: OAuth refresh、HTML本文、当初の画像ホットリンクで実投稿完了。2026-08-11に内部画像ストアとの混合方式を追加し、統合後の実投稿確認待ち
 - Phase 2d X: OAuth1.0a、v2メディアアップロード、ツイート生成まで完成し認証通過。API課金は行わず、ブラウザ投稿へ切替
 - Fedibird の写真付き投稿から Blogger / Bluesky への一気通貫を実画像で確認済み

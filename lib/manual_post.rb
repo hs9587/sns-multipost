@@ -2,7 +2,7 @@ require_relative "html_text"
 
 module SnsMultipost
   module ManualPost
-    LOCAL_IMAGE_TARGETS = %w[fedibird bluesky tumblr mixi mixi2].freeze
+    LOCAL_IMAGE_TARGETS = %w[fedibird bluesky tumblr blogger mixi mixi2].freeze
     PUBLIC_IMAGE_TARGETS = %w[threads blogger].freeze
 
     def self.resolve_image_paths(paths, base_dir: Dir.pwd)

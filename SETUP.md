@@ -1,8 +1,8 @@
 # SETUP（移設手順書）
 
 Windows 11 機への移設・認証・常駐運用手順。
-API 組の移設とタスクスケジューラ運用は実施済み。ブラウザ組は未実装のため、
-各サービスのポスター完成時に初回ログイン手順を追記する。
+API組の移設とタスクスケジューラ運用は実施済み。Blogger画像、mixi、mixi2、Jotterは
+専用Chromeを使うため、移設先で初回ログインまたはセーブポイント設定を行う。
 
 1. git clone
 2. bundle install
@@ -10,8 +10,8 @@ API 組の移設とタスクスケジューラ運用は実施済み。ブラウ�
 4. `ruby bin/watch --sync-only` で Fedibird の監視基準を現在へ合わせる
 5. タスクスケジューラ登録
 
-将来ブラウザ組を有効にするときは、採用したブラウザ操作ライブラリをインストールし、
-移設先のブラウザでログイン状態を新しく作る。cookie やブラウザプロファイルは別機体からコピーしない。
+移設先のブラウザでログイン状態を新しく作る。cookie やブラウザプロファイルは
+別機体からコピーしない。
 
 ## Bluesky のトークン
 
@@ -87,16 +87,22 @@ Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_ba
 
 ## ブラウザ投稿の初回ログイン
 
-ブラウザ投稿は、普段使いのChromeとは別の `state/browser/SNS名` プロファイルを使う。
-現在の対象は mixi2。初回だけ次を実行する:
+ブラウザ操作は、普段使いのChromeとは別の `state/browser/サービス名` プロファイルを使う。
+Blogger、mixi、mixi2は初回だけ対応するコマンドを実行する:
 
+    ruby bin/browser_login blogger
+    ruby bin/browser_login mixi
     ruby bin/browser_login mixi2
+
+BloggerはGoogleアカウントでログインし、対象ブログの投稿一覧が表示されたらChromeを閉じる。
+画像付きBlogger投稿では、本文投稿前にこの専用ChromeでBlogger内部画像ストアへ画像を保存する。
+APIで作る非公開の一時下書きは処理後に自動削除される。
 
 開いたChromeでMIXI IDのメールアドレス、届いた認証コード、利用するIDを順に選び、
 ホーム画面が表示されたらChromeを閉じる。メールアドレスや認証コードは設定ファイルへ
 保存しない。ログイン状態を含む専用プロファイルはGit管理外の `state/browser/mixi2` に残る。
 
-ログイン保持と投稿画面を、投稿せずに確認する:
+mixi2のログイン保持と投稿画面を、投稿せずに確認する:
 
     ruby bin/mixi2_smoke
 

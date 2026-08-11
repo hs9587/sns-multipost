@@ -118,7 +118,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "--target SNS"
     assert_includes stdout, "--image PATH"
     assert_includes stdout, "--from-fedibird-latest"
-    assert_includes stdout, "Fedibird、Bluesky、Tumblr、mixi、mixi2"
+    assert_includes stdout, "Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2"
     assert_includes stdout, "Threads、Blogger"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
     assert_includes stdout, "ruby bin/post"

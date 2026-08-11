@@ -25,7 +25,7 @@ parser = SnsMultipost::Cli.parser(
              'ruby bin/post -- "-から始まる本文"'],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
           "--targetは複数指定できます。省略時は用途に応じてtargets.postから投稿先を選びます。",
-          "--imageは複数指定できます。Fedibird、Bluesky、Tumblr、mixi、mixi2のジョブだけを作ります。",
+          "--imageは複数指定できます。Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2のジョブだけを作ります。",
           "--from-fedibird-latestは最新Fedibird投稿の本文と画像URLをThreads、Bloggerへ渡します。",
           "画像は絶対パスに直してキューへ保存するため、run_queue完了まで移動・削除しないでください。"]
 ) do |opts|
