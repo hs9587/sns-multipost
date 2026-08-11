@@ -65,6 +65,7 @@ sns-multipost/
 ## 5. トリガ（2系統）
 
 - `bin/watch`: Fedibird API で自分の新着投稿を取得。最終処理済み status id を `state/` に記録して差分検出。新着1投稿につき投稿先SNS数ぶんのジョブを `queue/` に書く。画像はこの時点でダウンロードしてローカルパスをジョブに記録。タスクスケジューラで5分おき起動。
+- `bin/post`: `--image` でローカル画像対応先、`--from-fedibird-latest` で最新Fedibird投稿の公開画像URLを必要とするThreads / Bloggerへ、二段階で手動ジョブを作成できる。`--target` は複数指定可能。
 - `bin/post "本文..."`: 写真なし・指示だけの投稿（おはよう投稿の2way目）。この場合きっかけ投稿が存在しないため、**Fedibird を含む全SNS** のジョブを作る。
 
 ## 6. ジョブ形式

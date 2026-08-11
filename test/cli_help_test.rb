@@ -116,9 +116,22 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "Usage: ruby bin/post [options] [TEXT...]"
     assert_includes stdout, "--target SNS"
     assert_includes stdout, "--image PATH"
+    assert_includes stdout, "--from-fedibird-latest"
     assert_includes stdout, "Fedibird、Bluesky、Tumblr、mixi、mixi2"
+    assert_includes stdout, "Threads、Blogger"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
     assert_includes stdout, "ruby bin/post"
+  end
+
+  def test_post_latest_fedibird_rejects_text_and_local_image_before_loading_config
+    _stdout, stderr, status = run_cli("post", "--from-fedibird-latest", "本文")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "TEXTを指定しません"
+
+    _stdout, stderr, status = run_cli(
+      "post", "--from-fedibird-latest", "--image", "photo.jpg")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "同時に指定できません"
   end
 
   def test_retry_requires_at_least_one_file

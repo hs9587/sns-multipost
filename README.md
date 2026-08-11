@@ -54,6 +54,7 @@
     ruby bin/post --image photo.jpg "本文" # ローカル画像対応5 SNSの画像付きキューを生成
     ruby bin/post --target fedibird --image photo.jpg "本文"
     ruby bin/post --target bluesky --image one.jpg --image two.jpg "本文"
+    ruby bin/post --target threads --target blogger --from-fedibird-latest
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
     ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める
@@ -83,12 +84,27 @@
 直近投稿を再検出できる。巻き戻し操作自体はキュー作成・画像取得・投稿を行わず、通常の除外規則は維持する。
 したがって `bin/post` 由来の自己投稿や返信は、巻き戻しても再配信されない。失敗ジョブの再実行には
 監視基準を戻さず `bin/retry` を使う。
+
+ローカル画像を投稿可能な全投稿先へ手動展開する場合は、処理を2段階に分ける。最初の `--image` は
+Fedibird / Bluesky / Tumblr / mixi / mixi2だけのジョブを作り、1回目の `run_queue` でFedibirdにも
+公開画像を作る。その後 `--from-fedibird-latest` が自分の最新Fedibird投稿から本文と画像URLを読み、
+Threads / Bloggerだけのジョブを作る。
+
+    ruby bin/post --image photo.jpg "本文"
+    ruby bin/run_queue
+    ruby bin/post --target threads --target blogger --from-fedibird-latest
+    ruby bin/run_queue
+
+`--from-fedibird-latest` は選択したFedibird投稿URLと画像枚数を表示し、最新投稿に画像がなければ
+ジョブを作らない。BloggerはFedibird画像を継続的にホットリンクするため、恒久画像置き場の課題は残る。
+Threadsは投稿時にMetaが公開URLから画像を取得する。この経路は実地テスト用で、Instagramからの
+本来の波及方法を決めた後に運用経路を再検討する。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ
 
-1. `bin/post --image` によるFedibird / Bluesky / Tumblr / mixi / mixi2投稿を実地確認
-2. BloggerとThreadsで共通利用できる恒久画像置き場と、InstagramからThreadsへの波及方法を検討
+1. `bin/post --image` と `--from-fedibird-latest` の二段階画像投稿を実地確認
+2. Bloggerの恒久画像置き場と、InstagramからThreadsへの波及方法を検討
 3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 

@@ -15,6 +15,11 @@ Threads はブラウザ操作ではなく、Meta公式 Threads API を使う。
 画像ごとの子コンテナとCAROUSELコンテナを作成する。各コンテナの状態が `FINISHED` になるまで待ち、
 `POST /me/threads_publish` で公開する。`ERROR` または `EXPIRED` は失敗ジョブとして残す。
 
+実地テスト用には `bin/post --target threads --target blogger --from-fedibird-latest` を用意する。
+自分の最新Fedibird投稿から本文と静止画像URLを取得し、ThreadsとBloggerのジョブだけを作る。
+この操作は `watch`、`since_id`、自己投稿除外状態を変更しない。対象投稿URLと画像枚数を表示し、
+画像がない場合はジョブを作成しない。
+
 認証スコープは `threads_basic,threads_content_publish`。`bin/threads_auth` が
 認可URL生成、認可コード交換、短期トークンから長期トークンへの交換を行い、
 `state/threads_token.json` に保存する。長期トークンは期限の7日前から更新する。
@@ -39,7 +44,8 @@ APIが投稿IDを返すことと、Threads上に投稿が公開されたこと�
 画像投稿は自動テストで、単画像の作成・処理待ち・公開、および複数画像の子コンテナ・
 カルーセル作成・処理待ち・公開まで確認済み。ただし、実運用ではInstagramからThreadsへの波及を
 想定しており、APIが必要とする恒久的な公開画像URLも未決定である。このため画像付き実地テストは
-意図的に行っていない。恒久画像置き場とInstagram連携を決めた後に、API画像投稿を使うかも含めて再検討する。
+まだ行っていない。上記のFedibird最新画像経路で技術確認した後も、恒久画像置き場とInstagram連携を
+決めた段階で、API画像投稿を実運用に使うかを再検討する。
 
 公式資料:
 
