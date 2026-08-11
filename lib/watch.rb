@@ -41,6 +41,34 @@ module SnsMultipost
       enqueue ? statuses.size : 0
     end
 
+    # 監視基準を古い投稿IDへ戻し、次回の通常runで直近の投稿を再検出できるようにする。
+    # この操作自体はキュー作成・画像取得を行わない。
+    def rewind(count: 1)
+      count = Integer(count)
+      raise "巻き戻し件数は1以上40以下にしてください" unless count.between?(1, 40)
+      unless File.exist?(@state_path)
+        raise "監視基準がありません。先に ruby bin/watch --sync-only を実行してください"
+      end
+
+      current = File.read(@state_path).strip
+      raise "監視基準が空です。先に ruby bin/watch --sync-only を実行してください" if current.empty?
+
+      older = @api.statuses(
+        account_id: @config["fedibird"]["account_id"],
+        max_id: current, limit: count)
+      if older.length < count
+        raise "#{count}件前のFedibird投稿を取得できないため、監視基準は変更しません"
+      end
+
+      rewound = older[count - 1]["id"].to_s
+      raise "巻き戻し先の投稿IDを取得できないため、監視基準は変更しません" if rewound.empty?
+
+      File.write(@state_path, rewound)
+      { from: current, to: rewound, count: count }
+    rescue ArgumentError, TypeError
+      raise "巻き戻し件数は1以上40以下にしてください"
+    end
+
     private
 
     def record_state(statuses)

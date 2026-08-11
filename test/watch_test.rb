@@ -10,8 +10,11 @@ class WatchTest < Minitest::Test
     def initialize(statuses)
       @statuses = statuses
     end
-    def statuses(account_id:, since_id: nil, **_)
-      since_id ? @statuses.select { |s| s["id"].to_i > since_id.to_i } : @statuses
+    def statuses(account_id:, since_id: nil, max_id: nil, limit: 40, **_)
+      result = @statuses
+      result = result.select { |s| s["id"].to_i > since_id.to_i } if since_id
+      result = result.select { |s| s["id"].to_i < max_id.to_i } if max_id
+      result.first(limit)
     end
   end
 
@@ -87,6 +90,53 @@ class WatchTest < Minitest::Test
 
       assert_empty queue.pending
       assert_equal "4", File.read(File.join(dir, "since_id.txt"))
+    end
+  end
+
+  def test_rewind_moves_since_id_to_previous_status_without_enqueue
+    Dir.mktmpdir do |dir|
+      watch, queue = build_watch(dir)
+      File.write(File.join(dir, "since_id.txt"), "5")
+
+      result = watch.rewind(count: 1)
+
+      assert_equal({ from: "5", to: "4", count: 1 }, result)
+      assert_equal "4", File.read(File.join(dir, "since_id.txt"))
+      assert_empty queue.pending
+    end
+  end
+
+  def test_rewind_can_move_more_than_one_status
+    Dir.mktmpdir do |dir|
+      watch, = build_watch(dir)
+      File.write(File.join(dir, "since_id.txt"), "5")
+
+      watch.rewind(count: 2)
+
+      assert_equal "3", File.read(File.join(dir, "since_id.txt"))
+    end
+  end
+
+  def test_rewind_does_not_change_state_when_history_is_insufficient
+    Dir.mktmpdir do |dir|
+      watch, = build_watch(dir)
+      state = File.join(dir, "since_id.txt")
+      File.write(state, "3")
+
+      error = assert_raises(RuntimeError) { watch.rewind(count: 1) }
+
+      assert_match(/監視基準は変更しません/, error.message)
+      assert_equal "3", File.read(state)
+    end
+  end
+
+  def test_rewind_requires_existing_state
+    Dir.mktmpdir do |dir|
+      watch, = build_watch(dir)
+
+      error = assert_raises(RuntimeError) { watch.rewind(count: 1) }
+
+      assert_match(/--sync-only/, error.message)
     end
   end
 

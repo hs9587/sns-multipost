@@ -57,6 +57,7 @@
     ruby bin/run_queue            # キュー処理。dry_run=false なら実投稿
     ruby bin/watch                # Fedibird 新着検出 → キュー生成
     ruby bin/watch --sync-only    # キューを作らず since_id だけ最新へ進める
+    ruby bin/watch --rewind 1     # キューを作らず監視基準を1件戻す
     ruby bin/retry failed/x.json  # 失敗ジョブを再実行
     ruby bin/dryrun_titles 200    # タイトル辞書のドライラン
     ruby bin/threads_auth --help  # Threads API の初回OAuth認証
@@ -78,6 +79,10 @@
 別々に列挙するため、入口ごとに投稿先を選べる。
 `bin/post` からFedibirdへ投稿した場合は、成功した投稿IDを `state/self_posted.txt` に記録する。
 次の `watch` はその投稿を自己投稿として除外し、他SNSへ重複展開せずに監視基準だけ先へ進める。
+デバッグや再処理では `bin/watch --rewind 1` で監視基準だけを1件戻し、次の通常 `bin/watch` で
+直近投稿を再検出できる。巻き戻し操作自体はキュー作成・画像取得・投稿を行わず、通常の除外規則は維持する。
+したがって `bin/post` 由来の自己投稿や返信は、巻き戻しても再配信されない。失敗ジョブの再実行には
+監視基準を戻さず `bin/retry` を使う。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ

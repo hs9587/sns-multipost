@@ -151,5 +151,5 @@ sns-multipost/
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
 - Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
 - Phase 3: mixi2は専用Chromeからの実投稿まで完了。JotterのDOMと認証方式は一部調査済み。Instagram / mixi / Facebookは未着手。Xは規約上ブラウザ自動化しない
-- 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせできる
+- 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせでき、`--rewind COUNT` でキューを作らず直近投稿を再検出対象へ戻せる
 - ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃

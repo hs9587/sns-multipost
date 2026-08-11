@@ -9,19 +9,32 @@ require "fedibird_api"
 require "watch"
 
 sync_only = false
+rewind_count = nil
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/watch [options]",
   description: "sns-multipostの入口としてFedibirdの新着を検出し、queue/に投稿ジョブを作成します。\n通常はこの後に ruby bin/run_queue を実行して、各SNSへ投稿します。",
-  examples: ["ruby bin/watch", "ruby bin/watch --sync-only"],
+  examples: ["ruby bin/watch", "ruby bin/watch --sync-only",
+             "ruby bin/watch --rewind 1"],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
           "通常実行はdry_runに関係なくジョブを作成します。",
-          "--sync-onlyはキューを作らず、監視基準だけ最新へ進めます。"]) do |opts|
+          "--sync-onlyはキューを作らず、監視基準だけ最新へ進めます。",
+          "--rewindはキューを作らず監視基準だけ戻し、次の通常実行で直近投稿を再検出させます。",
+          "巻き戻し後の通常実行にも、返信・自己投稿を除外する規則が適用されます。"]) do |opts|
   opts.on("--sync-only", "キューを作らず監視基準だけ最新へ進める") do
     sync_only = true
+  end
+  opts.on("--rewind COUNT", Integer, "監視基準をCOUNT件前へ戻す（1～40）") do |value|
+    rewind_count = value
   end
 end
 SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
+if sync_only && rewind_count
+  SnsMultipost::Cli.usage_error(parser, "--sync-onlyと--rewindは同時に指定できません")
+end
+if rewind_count && !rewind_count.between?(1, 40)
+  SnsMultipost::Cli.usage_error(parser, "COUNTは1以上40以下の整数にしてください")
+end
 
 config = SnsMultipost::Config.load
 watch = SnsMultipost::Watch.new(
@@ -34,9 +47,14 @@ watch = SnsMultipost::Watch.new(
   self_posted: SnsMultipost::SelfPosted.new,
   state_path: File.expand_path("../state/since_id.txt", __dir__),
   media_root: File.expand_path("../state/media", __dir__))
-count = watch.run(enqueue: !sync_only)
-if sync_only
+if rewind_count
+  result = watch.rewind(count: rewind_count)
+  puts "rewind: #{result[:from]} -> #{result[:to]}（#{result[:count]}件を再検出対象にしました。キューは作りません）"
+  puts "次: ruby bin/watch"
+elsif sync_only
+  watch.run(enqueue: false)
   puts "sync-only: 基準を最新に合わせました（キューは作りません）"
 else
+  count = watch.run
   puts "new statuses: #{count}"
 end

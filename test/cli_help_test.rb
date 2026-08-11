@@ -34,8 +34,20 @@ class CliHelpTest < Minitest::Test
     stdout, _stderr, status = run_cli("watch", "--help")
     assert status.success?
     assert_includes stdout, "--sync-only"
+    assert_includes stdout, "--rewind COUNT"
     assert_includes stdout, "キューを作らず監視基準だけ最新へ進める"
+    assert_includes stdout, "次の通常実行で直近投稿を再検出"
     assert_includes stdout, "この後に ruby bin/run_queue"
+  end
+
+  def test_watch_rewind_rejects_invalid_or_conflicting_options_before_loading_config
+    _stdout, stderr, status = run_cli("watch", "--rewind", "0")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "COUNTは1以上40以下"
+
+    _stdout, stderr, status = run_cli("watch", "--sync-only", "--rewind", "1")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "同時に指定できません"
   end
 
   def test_run_queue_help_explains_watch_precondition

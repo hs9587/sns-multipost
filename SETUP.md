@@ -173,5 +173,6 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 
 - `bin/watch` は dry_run に関係なくジョブ生成と基準更新を行う（投稿の可否は run_queue 側の dry_run で決まる）
 - `bin/watch --sync-only` はキューを作らず since_id だけ最新へ前進させる（基準合わせ専用。運用中に「今の新着は流さず基準だけ合わせ直したい」ときにも使える）
+- `bin/watch --rewind 1` はキューを作らず since_id を1件前へ戻す。次の通常 `bin/watch` で直近投稿を再検出する。タスクスケジューラのwatchと同時に実行しない
 - 自己投稿は state/self_posted.txt で除外されるためループしない
 - トークンが期限切れになっても、refresh 対応済みの SNS（Blogger, Tumblr）は自動更新される
