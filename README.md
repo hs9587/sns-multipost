@@ -11,7 +11,7 @@
 - Phase 1（基盤＋Fedibird）と Phase 2（API 組）は実装完了
 - Fedibird / Bluesky / Tumblr / Blogger / Threads は実投稿確認済み
 - X は OAuth1.0a 認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
-- Threads は公式APIによるテキスト投稿が稼働済み。画像APIコードは実装したが、Instagramからの波及方法と恒久画像置き場を決めるまで実地テストを保留
+- Threads は公式APIによるテキスト投稿と、Fedibird最新画像URLを使う単画像投稿を実地確認済み。カルーセルは自動テスト済み
 - Tumblr の短命トークンとローテーション型 refresh token は自動更新・永続化済み
 - Fedibird 監視から Blogger / Bluesky への写真付き投稿を一気通貫で確認済み
 - Windows タスクスケジューラによる定期実行は稼働実績あり
@@ -33,7 +33,7 @@
 | mixi | 稼働 | 専用Chromeからつぶやき実投稿確認済み。本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chromeから実投稿確認済み。本文150文字・画像4枚 |
 | Jotter.me | 稼働 | セーブポイントを素のChromeで復元後に自動操作を接続。公開テキスト投稿・URL確認済み |
-| Threads | テキスト稼働・画像保留 | 画像APIコードはあるが実地テスト未実施。Instagram連携と恒久画像置き場の決定後に再検討 |
+| Threads | 稼働・画像運用は再検討 | テキストと単画像を実投稿確認済み。カルーセルは自動テスト済み。Instagramからの波及方法は今後検討 |
 | Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
 
 ## 主な要件
@@ -97,21 +97,21 @@ Threads / Bloggerだけのジョブを作る。
 
 `--from-fedibird-latest` は選択したFedibird投稿URLと画像枚数を表示し、最新投稿に画像がなければ
 ジョブを作らない。BloggerはFedibird画像を継続的にホットリンクするため、恒久画像置き場の課題は残る。
-Threadsは投稿時にMetaが公開URLから画像を取得する。この経路は実地テスト用で、Instagramからの
-本来の波及方法を決めた後に運用経路を再検討する。
+Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの二段階経路でThreadsと
+Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿を削除した。Instagramからの本来の
+波及方法を決めた後に、Threads画像の実運用経路は再検討する。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ
 
-1. `bin/post --image` と `--from-fedibird-latest` の二段階画像投稿を実地確認
-2. Bloggerの恒久画像置き場と、InstagramからThreadsへの波及方法を検討
-3. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
-4. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
+1. Bloggerの恒久画像置き場と、InstagramからThreadsへの波及方法を検討
+2. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
+3. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
 Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
 Blogger側へ自動的に複製されてはいなかった。Threads画像APIもMeta側から取得できる公開URLを必要とする。
-Threads画像はInstagramからの波及を想定しているため現段階では実地テストせず、恒久画像置き場と
-Instagram連携の方針を決めた後に再検討する。
+Fedibird最新画像を使うThreads単画像投稿は成功したが、Bloggerは画像をホットリンクし続ける。
+恒久画像置き場とInstagram連携の方針を決めた後に、両投稿先の実運用経路を再検討する。
 
 ## 保存容量と清掃
 
