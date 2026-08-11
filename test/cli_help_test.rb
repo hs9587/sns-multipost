@@ -76,6 +76,7 @@ class CliHelpTest < Minitest::Test
     stdout, _stderr, status = run_cli("browser_login", "--help")
     assert status.success?
     assert_includes stdout, "state/browser/"
+    assert_includes stdout, "ruby bin/browser_login blogger"
     assert_includes stdout, "このコマンドは投稿を行いません"
   end
 

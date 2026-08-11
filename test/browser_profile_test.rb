@@ -31,6 +31,20 @@ class BrowserProfileTest < Minitest::Test
     end
   end
 
+  def test_builds_isolated_blogger_chrome_command
+    Dir.mktmpdir do |dir|
+      chrome = File.join(dir, "chrome.exe")
+      File.write(chrome, "")
+      profile = SnsMultipost::BrowserProfile.new(root: dir, chrome_path: chrome)
+
+      command = profile.command("blogger")
+
+      assert_includes command, "--user-data-dir=#{File.join(dir, 'state', 'browser', 'blogger')}"
+      assert_equal "https://www.blogger.com/", command.last
+      assert Dir.exist?(profile.profile_dir("blogger"))
+    end
+  end
+
   def test_rejects_unknown_service
     Dir.mktmpdir do |dir|
       profile = SnsMultipost::BrowserProfile.new(root: dir, chrome_path: "missing")

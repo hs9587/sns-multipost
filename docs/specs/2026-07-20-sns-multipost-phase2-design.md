@@ -73,7 +73,7 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 
 - **X の課金**: Pay Per Use のクレジットは購入しない。OAuth1.0a実装は保管し、実運用はPhase 3のブラウザ投稿とする
 - **Tumblr の token rotation**: 最新 refresh token は `state/tumblr_token.json` にしかない場合がある。失った場合はOAuth認可をやり直す
-- **Blogger の画像**: 現在は Fedibird 画像のホットリンク。元画像を削除すると Blogger 側も切れるため、恒久的な画像ホストへの移行が課題
+- **Blogger の画像**: 通常投稿は現在も Fedibird 画像のホットリンク。Blogger内部画像ストアへのブラウザアップロードと恒久URL取得は2026-08-11に実証済みだが、既存のAPI投稿への接続は未実装
 
 ## 9. 実装結果（2026-08-04）
 

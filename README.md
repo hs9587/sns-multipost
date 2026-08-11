@@ -96,7 +96,8 @@ Threads / Bloggerだけのジョブを作る。
     ruby bin/run_queue
 
 `--from-fedibird-latest` は選択したFedibird投稿URLと画像枚数を表示し、最新投稿に画像がなければ
-ジョブを作らない。BloggerはFedibird画像を継続的にホットリンクするため、恒久画像置き場の課題は残る。
+ジョブを作らない。現在のBlogger通常投稿はFedibird画像を継続的にホットリンクする。
+Blogger内部画像ストアへのブラウザアップロードは実証済みだが、通常投稿への接続は未実装。
 Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの二段階経路でThreadsと
 Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿を削除した。Instagramからの本来の
 波及方法を決めた後に、Threads画像の実運用経路は再検討する。
@@ -104,14 +105,19 @@ Bloggerの単画像投稿を実地確認し、公開確認後にテスト投稿�
 
 ## ロードマップ
 
-1. Bloggerの恒久画像置き場と、InstagramからThreadsへの波及方法を検討
+1. 実証済みのBlogger画像ストアへのブラウザアップロードを、既存のBlogger API投稿へ安全に接続
 2. ページング、HTTPタイムアウト、排他制御、古いジョブ・画像の清掃のうち導入しやすいものを追加
 3. ここまでで、X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討
 
 Bloggerの公開済み記事を確認したところ、記事本文の画像URLは公開後も `s3.fedibird.com` のままで、
 Blogger側へ自動的に複製されてはいなかった。Threads画像APIもMeta側から取得できる公開URLを必要とする。
 Fedibird最新画像を使うThreads単画像投稿は成功したが、Bloggerは画像をホットリンクし続ける。
-恒久画像置き場とInstagram連携の方針を決めた後に、両投稿先の実運用経路を再検討する。
+Blogger内部画像ストアを通常投稿へ接続した後、Instagram連携とThreads画像の実運用経路を再検討する。
+
+Blogger編集画面の「パソコンからアップロード」を自動操作する小規模実証では、ローカルPNGを
+`blogger.googleusercontent.com` へ保存し、Chromeを閉じた後も下書きで表示できた。
+表示用URLの `/s320/` を `/s0/` に変更した元サイズURLも、認証なしでHTTP 200を確認した。
+詳細と再現手順は `docs/specs/2026-08-11-blogger-image-store.md` を参照。
 
 ## 保存容量と清掃
 

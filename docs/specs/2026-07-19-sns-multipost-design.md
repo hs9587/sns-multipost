@@ -150,7 +150,7 @@ sns-multipost/
 - Phase 1: ファイルキュー、Fedibird 監視・投稿、タイトル辞書、再試行まで完了
 - Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認。APIコードは保管する
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
-- Blogger: 画像アップロード API がないため、現在は Fedibird の画像 URL を HTML にホットリンク。恒久ホストへの移行が将来課題
+- Blogger: 画像アップロード API がないため、通常投稿は現在も Fedibird の画像 URL を HTML にホットリンク。Blogger編集画面から内部画像ストアへアップロードする方法は2026-08-11に実証済みで、通常投稿への接続が将来課題
 - Phase 3: mixi2・mixi・Jotter.meは実投稿まで完了。Threads単画像もFedibird最新画像経路で実投稿確認済み。Instagram / Facebookは自動投稿せず、Xも規約上ブラウザ自動化しない
 - 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせでき、`--rewind COUNT` でキューを作らず直近投稿を再検出対象へ戻せる
 - ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃

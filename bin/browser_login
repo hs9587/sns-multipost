@@ -5,8 +5,8 @@ require "browser_profile"
 
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/browser_login [options] SNS",
-  description: "sns-multipostのブラウザ投稿専用Chromeプロファイルを開き、初回ログインを行います。\n対応SNSは mixi、mixi2 です。ログイン情報はstate/browser/に保存され、Gitには入りません。",
-  examples: ["ruby bin/browser_login mixi", "ruby bin/browser_login mixi2"],
+  description: "sns-multipostのブラウザ投稿専用Chromeプロファイルを開き、初回ログインを行います。\n対応サービスは Blogger、mixi、mixi2 です。ログイン情報はstate/browser/に保存され、Gitには入りません。",
+  examples: ["ruby bin/browser_login blogger", "ruby bin/browser_login mixi", "ruby bin/browser_login mixi2"],
   notes: ["開いたChromeで本人がログインし、ホーム画面を確認してからChromeを閉じてください。",
           "このコマンドは投稿を行いません。普段使いのChromeプロファイルとは分離されます。"])
 SnsMultipost::Cli.parse!(parser)

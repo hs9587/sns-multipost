@@ -47,7 +47,8 @@ ThreadsとBloggerへ `bin/post --from-fedibird-latest` → `bin/run_queue` で�
 確認し、テスト投稿は確認後に削除した。実際の投稿IDや認証情報は保存しない。
 
 単画像の技術確認は完了したが、実運用ではInstagramからThreadsへの波及を想定している。
-恒久画像置き場とInstagram連携を決めた段階で、API画像投稿を実運用に使うかを再検討する。
+Blogger内部画像ストアへのアップロードは実証済みだが通常投稿への接続は未実装。
+その接続とInstagram連携を決めた段階で、API画像投稿を実運用に使うかを再検討する。
 
 公式資料:
 
