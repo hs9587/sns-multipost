@@ -32,10 +32,13 @@ class JotterBrowserTest < Minitest::Test
     attr_reader :goto_count, :typed_text, :media_path, :quit_called, :screenshot_call,
                 :confirm_clicked
 
-    def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false)
+    def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false,
+                   home_requires_reset: false)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
+      @home_requires_reset = home_requires_reset
+      @home_reset = false
       @goto_count = 0
       @account_open = false
       @composer_open = false
@@ -51,7 +54,9 @@ class JotterBrowserTest < Minitest::Test
     def evaluate(script, *_args)
       case script
       when SnsMultipost::JotterBrowser::LOGGED_IN_JS
-        { "loggedIn" => true }
+        { "loggedIn" => !@home_requires_reset || @home_reset }
+      when SnsMultipost::JotterBrowser::HOME_RESET_JS
+        @home_reset = true
       when SnsMultipost::JotterBrowser::SAVEPOINT_READY_JS
         { "ready" => true }
       when SnsMultipost::JotterBrowser::OPEN_ACCOUNT_JS
@@ -159,6 +164,15 @@ class JotterBrowserTest < Minitest::Test
     assert_equal true, result["hasEditor"]
     assert_equal true, result["hasSubmit"]
     assert_equal true, result["hasPublic"]
+  end
+
+  def test_smoke_reloads_home_when_account_panel_remains_open
+    browser = FakeBrowser.new(home_requires_reset: true)
+
+    result = client(browser).smoke
+
+    assert_equal true, result["hasEditor"]
+    assert_equal true, result["hasSubmit"]
   end
 
   def test_post_enters_text_selects_public_and_confirms_url

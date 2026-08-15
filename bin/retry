@@ -4,6 +4,7 @@ require "cli"
 require "config"
 require "job_queue"
 require "runner"
+require "run_lock"
 require "poster/all"
 
 parser = SnsMultipost::Cli.parser(
@@ -11,6 +12,7 @@ parser = SnsMultipost::Cli.parser(
   description: "sns-multipostで失敗したfailed/のジョブをqueue/へ戻し、そのジョブだけ再実行します。\n通常はbin/run_queueの結果がfailedになった後、原因を直してから使用します。",
   examples: ["ruby bin/retry failed/20260805-120000_bluesky_ab12.json"],
   notes: ["dry_run: false の場合は実投稿します。",
+          "別のrun_queueまたはretryが実行中なら、二重投稿を避けるため処理せず終了します。",
           "複数の失敗ジョブをまとめて指定できます。"])
 SnsMultipost::Cli.parse!(parser)
 if ARGV.empty?
@@ -18,10 +20,16 @@ if ARGV.empty?
 end
 
 config = SnsMultipost::Config.load
-queue = SnsMultipost::JobQueue.new
-requeued = ARGV.map { |p| queue.requeue(File.expand_path(p)) }
-jobs = queue.pending.select { |j| requeued.include?(j.path) }
-results = SnsMultipost::Runner.new(config: config, queue: queue).run(jobs)
-results.each do |job, status, detail|
-  puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+acquired = SnsMultipost::RunLock.new.synchronize do
+  queue = SnsMultipost::JobQueue.new
+  requeued = ARGV.map { |p| queue.requeue(File.expand_path(p)) }
+  jobs = queue.pending.select { |j| requeued.include?(j.path) }
+  results = SnsMultipost::Runner.new(config: config, queue: queue).run(jobs)
+  results.each do |job, status, detail|
+    puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+  end
+end
+unless acquired
+  puts "skip: another run_queue or retry is active"
+  exit 0
 end

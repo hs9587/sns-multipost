@@ -4,6 +4,7 @@ require "cli"
 require "config"
 require "job_queue"
 require "runner"
+require "run_lock"
 require "poster/all"
 
 parser = SnsMultipost::Cli.parser(
@@ -12,15 +13,23 @@ parser = SnsMultipost::Cli.parser(
   notes: ["bin/postで手動作成したジョブも処理します。",
           "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
           "Blogger画像には事前の browser_login blogger と、Chromeを操作できるログオン中の実行環境が必要です。",
+          "別のrun_queueまたはretryが実行中なら、二重投稿を避けるため処理せず終了します。",
           "dry_run: false の場合は実投稿します。",
           "dry_run: true でも処理したジョブは done/ へ移動します。"])
 SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
 
 config = SnsMultipost::Config.load
-results = SnsMultipost::Runner.new(
-  config: config, queue: SnsMultipost::JobQueue.new).run
-results.each do |job, status, detail|
-  puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+results = nil
+acquired = SnsMultipost::RunLock.new.synchronize do
+  results = SnsMultipost::Runner.new(
+    config: config, queue: SnsMultipost::JobQueue.new).run
+  results.each do |job, status, detail|
+    puts "#{status}\t#{job.sns}\t#{detail.inspect[0, 120]}"
+  end
+end
+unless acquired
+  puts "skip: another run_queue or retry is active"
+  exit 0
 end
 puts "ok=#{results.count { |r| r[1] == :ok }} failed=#{results.count { |r| r[1] == :failed }}"

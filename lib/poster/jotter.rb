@@ -6,9 +6,10 @@ require_relative "../token_store"
 module SnsMultipost
   module Poster
     class Jotter < Base
-      def initialize(config, client: nil)
+      def initialize(config, client: nil, logger: ->(message) { warn message })
         super(config)
         @client = client
+        @logger = logger
       end
 
       def perform(job)
@@ -35,7 +36,8 @@ module SnsMultipost
           settings = @config["jotter"] || {}
           JotterBrowser.new(
             savepoint_url: settings["savepoint_url"],
-            account_name: settings["account_name"])
+            account_name: settings["account_name"],
+            logger: @logger)
         end
       end
 

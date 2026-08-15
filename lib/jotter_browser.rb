@@ -25,6 +25,14 @@ module SnsMultipost
       }))()
     JS
 
+    HOME_RESET_JS = <<~'JS'.freeze
+      (() => {
+        history.replaceState(null, '', '/ja-JP/');
+        location.reload();
+        return true;
+      })()
+    JS
+
     SAVEPOINT_READY_JS = <<~'JS'.freeze
       (() => {
         const welcome = location.pathname.includes('/welcome');
@@ -347,8 +355,7 @@ module SnsMultipost
         open_authenticated_home
       end
 
-      goto_safely(HOME_URL)
-      wait_for { safe_evaluate(LOGGED_IN_JS) } || raise("Jotterのホーム画面を確認できません")
+      return_to_home || raise("Jotterのホーム画面を確認できません")
       existing_urls = safe_evaluate(POST_URLS_JS) || []
       raise "Jotterの投稿フォームを開けません" unless wait_for(timeout: @auth_timeout) {
         safe_evaluate(OPEN_COMPOSER_JS)
@@ -537,11 +544,7 @@ module SnsMultipost
         @sleeper.call(1)
         next unless correct_account?
 
-        goto_safely(HOME_URL)
-        home_ready = wait_for(timeout: @auth_timeout) do
-          state = safe_evaluate(LOGGED_IN_JS)
-          state && state["loggedIn"]
-        end
+        home_ready = return_to_home
         if home_ready
           status("Jotter: #{@account_name.empty? ? 'ログイン済み' : @account_name} を確認")
           return true
@@ -570,6 +573,22 @@ module SnsMultipost
       else
         status("Jotter: 別のアカウントが復元されたため再試行")
         false
+      end
+    end
+
+    def return_to_home
+      goto_safely(HOME_URL)
+      ready = wait_for(timeout: [@auth_timeout, 10].min) do
+        state = safe_evaluate(LOGGED_IN_JS)
+        state && state["loggedIn"]
+      end
+      return true if ready
+
+      status("Jotter: 本人確認画面を閉じるためホームを再読込")
+      safe_evaluate(HOME_RESET_JS)
+      wait_for(timeout: @auth_timeout) do
+        state = safe_evaluate(LOGGED_IN_JS)
+        state && state["loggedIn"]
       end
     end
 
