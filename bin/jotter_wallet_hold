@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "config"
+require "jotter_browser"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/jotter_wallet_hold [options]",
+  description: "sns-multipost専用ChromeでJotterウォレットを開いたまま保持し、手動DEN振替を補助します。\nEnterを押すまでChromeを保持し、このコマンド自身は送金・振替・検証要求を行いません。",
+  examples: ["ruby bin/jotter_wallet_hold"],
+  notes: ["別機または普段のブラウザでも同じ口座のウォレットを開き、そちらから手動で振替してください。",
+          "保持中はWindowsタスクや別のsns-multipostコマンドを実行しないでください。",
+          "Enterを押すと最終DEN残高を読み、専用Chromeを閉じます。"])
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+
+config = SnsMultipost::Config.load
+settings = config["jotter"] || {}
+client = SnsMultipost::JotterBrowser.new(
+  savepoint_url: settings["savepoint_url"],
+  account_name: settings["account_name"],
+  logger: ->(message) { puts message })
+
+result = client.wallet_hold do |initial|
+  balances = initial["balances"] || {}
+  puts "専用Jotterウォレットを開いたまま保持しています。"
+  puts "開始時DEN: 利用可能=#{balances['available'] || '不明'} " \
+       "未検証=#{balances['unverified'] || '不明'} " \
+       "要更新=#{balances['needsUpdate'] || '不明'} " \
+       "入金予定=#{balances['scheduled'] || '不明'} " \
+       "合計=#{balances['total'] || '不明'}"
+  puts "別機または普段のブラウザから手動振替し、画面へ反映されたらEnterを押してください。"
+  STDIN.gets
+end
+
+balances = result["balances"] || {}
+puts "終了時DEN: 利用可能=#{balances['available'] || '不明'} " \
+     "未検証=#{balances['unverified'] || '不明'} " \
+     "要更新=#{balances['needsUpdate'] || '不明'} " \
+     "入金予定=#{balances['scheduled'] || '不明'} " \
+     "合計=#{balances['total'] || '不明'}"
+puts "専用Chromeを閉じました。このコマンドは送金、振替、DEN検証要求をしていません。"

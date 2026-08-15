@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "config"
+require "jotter_browser"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/jotter_media_smoke [options] IMAGE",
+  description: "sns-multipost専用ChromeでJotter投稿フォームへ画像1枚を選択し、プレビューとDEN表示を確認します。\nPostボタンは押さず、Jotterへの投稿とDEN支払いは行いません。",
+  examples: ["ruby bin/jotter_media_smoke photo.jpg"],
+  notes: ["先頭の画像1枚だけを対象にする実証コマンドです。",
+          "画像選択後のファイル入力、プレビュー、必要DEN表示を確認してChromeを閉じます。",
+          "先にconfig.ymlのjotter.savepoint_urlとjotter.account_nameを設定してください。"])
+SnsMultipost::Cli.parse!(parser)
+
+if ARGV.empty?
+  SnsMultipost::Cli.usage_error(parser, "画像ファイルを指定してください")
+end
+if ARGV.size > 1
+  SnsMultipost::Cli.usage_error(parser, "画像は1枚だけ指定してください")
+end
+
+config = SnsMultipost::Config.load
+settings = config["jotter"] || {}
+result = SnsMultipost::JotterBrowser.new(
+  savepoint_url: settings["savepoint_url"],
+  account_name: settings["account_name"],
+  logger: ->(message) { puts message }).media_smoke(ARGV.first)
+
+puts "Jotter media smoke: ok"
+puts "画像入力: count=#{result['inputCount']} accept=#{result['accept'].inspect} " \
+     "multiple=#{result['multiple'] ? 'yes' : 'no'} files=#{result['fileCount']}"
+puts "画像プレビュー候補: #{result['previewCount']}"
+den_lines = Array(result["denLines"])
+if den_lines.empty?
+  puts "DEN表示: 画像選択段階では確認できません"
+else
+  puts "DEN表示:"
+  den_lines.each { |line| puts "  #{line}" }
+end
+status_lines = Array(result["statusLines"])
+unless status_lines.empty?
+  puts "画像処理表示:"
+  status_lines.each { |line| puts "  #{line}" }
+end
+puts "画像を選択して確認しただけです。投稿とDEN支払いはしていません。"

@@ -7,7 +7,7 @@ module SnsMultipost
     LIMITS = {
       "fedibird" => 4, "x" => 4, "bluesky" => 4, "tumblr" => 10,
       "blogger" => 20, "instagram" => 10, "mixi" => 1, "mixi2" => 4,
-      "jotter" => 0, "threads" => 20
+      "jotter" => 1, "threads" => 20
     }.freeze
     DEFAULT_LIMIT = 1
     # SNS 別の画像1枚あたりバイト上限。ここに無い SNS は無制限

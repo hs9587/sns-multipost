@@ -5,9 +5,10 @@ class JotterBrowserTest < Minitest::Test
   class FakeNode
     attr_reader :text
 
-    def initialize(on_click: nil, on_type: nil)
+    def initialize(on_click: nil, on_type: nil, on_select_file: nil)
       @on_click = on_click
       @on_type = on_type
+      @on_select_file = on_select_file
     end
 
     def click
@@ -20,14 +21,21 @@ class JotterBrowserTest < Minitest::Test
       @on_type&.call(text)
       self
     end
+
+    def select_file(path)
+      @on_select_file&.call(path)
+      self
+    end
   end
 
   class FakeBrowser
-    attr_reader :goto_count, :typed_text, :quit_called, :screenshot_call, :confirm_clicked
+    attr_reader :goto_count, :typed_text, :media_path, :quit_called, :screenshot_call,
+                :confirm_clicked
 
-    def initialize(wrong_account_once: false, confirm_post: true)
+    def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
+      @hide_browser_id = hide_browser_id
       @goto_count = 0
       @account_open = false
       @composer_open = false
@@ -63,6 +71,43 @@ class JotterBrowserTest < Minitest::Test
         []
       when SnsMultipost::JotterBrowser::POST_URL_JS
         @submitted && @confirm_clicked && @confirm_post ? "https://jotter.me/ja-JP/jot/#new" : nil
+      when SnsMultipost::JotterBrowser::WALLET_STATE_JS
+        if @den_verified
+          return {
+            "wallet" => true,
+            "accountId" => "account-secret",
+            "browserId" => @hide_browser_id ? nil : "browser-secret",
+            "balances" => {
+              "available" => "270", "unverified" => "0",
+              "needsUpdate" => "0", "scheduled" => "0", "total" => "270"
+            },
+            "diagnostic" => []
+          }
+        end
+        {
+          "wallet" => true,
+          "accountId" => "account-secret",
+          "browserId" => @hide_browser_id ? nil : "browser-secret",
+          "balances" => {
+            "available" => "180", "unverified" => "90",
+            "needsUpdate" => "0", "scheduled" => "0", "total" => "270"
+          },
+          "diagnostic" => []
+        }
+      when SnsMultipost::JotterBrowser::VERIFY_UNVERIFIED_JS
+        @den_verified = true
+      when SnsMultipost::JotterBrowser::MEDIA_STATE_JS
+        {
+          "hasInput" => @composer_open,
+          "inputCount" => @composer_open ? 1 : 0,
+          "accept" => "image/jpeg,image/png",
+          "multiple" => true,
+          "fileCount" => @media_path ? 1 : 0,
+          "previewCount" => @media_path ? 1 : 0,
+          "requiredDen" => @media_path ? "90" : nil,
+          "denLines" => @media_path ? ["90 DEN"] : [],
+          "statusLines" => []
+        }
       end
     end
 
@@ -79,6 +124,8 @@ class JotterBrowserTest < Minitest::Test
         FakeNode.new(on_type: ->(text) { @typed_text = text })
       when SnsMultipost::JotterBrowser::SUBMIT_SELECTOR
         FakeNode.new(on_click: -> { @submitted = true })
+      when 'input[type="file"][accept*="image"]', SnsMultipost::JotterBrowser::MEDIA_SELECTOR
+        FakeNode.new(on_select_file: ->(path) { @media_path = path })
       end
     end
 
@@ -99,6 +146,7 @@ class JotterBrowserTest < Minitest::Test
       timeout: 0,
       auth_timeout: 0,
       confirmation_timeout: 0,
+      wallet_browser_id_timeout: 0,
       savepoint_settle_seconds: 0,
       sleeper: ->(_seconds) {})
   end
@@ -121,6 +169,91 @@ class JotterBrowserTest < Minitest::Test
     assert_equal true, browser.confirm_clicked
     assert_equal true, result[:posted]
     assert_equal "https://jotter.me/ja-JP/jot/#new", result[:url]
+  end
+
+  def test_wallet_smoke_reads_ids_and_den_without_posting
+    browser = FakeBrowser.new
+    result = client(browser).wallet_smoke
+
+    assert_equal "account-secret", result["accountId"]
+    assert_equal "browser-secret", result["browserId"]
+    assert_equal "180", result.dig("balances", "available")
+    refute browser.confirm_clicked
+  end
+
+  def test_wallet_hold_keeps_browser_open_during_block
+    browser = FakeBrowser.new
+    yielded = nil
+    result = client(browser).wallet_hold do |state|
+      yielded = state
+      refute browser.quit_called
+    end
+
+    assert_equal "browser-secret", yielded["browserId"]
+    assert_equal "180", result.dig("balances", "available")
+    assert_nil browser.quit_called
+  end
+
+  def test_wallet_verify_checks_identity_then_makes_den_available
+    browser = FakeBrowser.new
+    identity = nil
+    result = client(browser).wallet_verify(
+      required_den: 200, attempts: 2, verification_timeout: 0) do |state|
+      identity = state["browserId"]
+    end
+
+    assert_equal "browser-secret", identity
+    assert_equal "available", result["status"]
+    assert_equal 1, result["attempts"]
+    assert_equal "270", result.dig("after", "balances", "available")
+  end
+
+  def test_media_smoke_selects_one_image_without_posting
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "one.png")
+      File.binwrite(path, "image")
+      browser = FakeBrowser.new
+      result = client(browser).media_smoke(path)
+
+      assert_equal 1, result["fileCount"]
+      assert_equal 1, result["previewCount"]
+      assert_equal "90", result["requiredDen"]
+      assert_equal ["90 DEN"], result["denLines"]
+      refute browser.confirm_clicked
+    end
+  end
+
+  def test_post_attaches_first_image_after_wallet_identity_and_den_check
+    Dir.mktmpdir do |dir|
+      first = File.join(dir, "one.png")
+      second = File.join(dir, "two.png")
+      File.binwrite(first, "one")
+      File.binwrite(second, "two")
+      browser = FakeBrowser.new
+      expected = Digest::SHA256.hexdigest("jotter-wallet-v1\0browser-secret")[0, 12]
+
+      result = client(browser).post(
+        text: "画像投稿", media_paths: [first, second],
+        expected_browser_id_fingerprint: expected)
+
+      assert_equal first, browser.media_path
+      assert_equal true, result[:posted]
+    end
+  end
+
+  def test_image_post_can_use_confirmed_profile_when_browser_id_is_not_visible
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "one.png")
+      File.binwrite(path, "one")
+      browser = FakeBrowser.new(hide_browser_id: true)
+
+      result = client(browser).post(
+        text: "無人画像投稿", media_paths: [path],
+        expected_browser_id_fingerprint: "saved-reference")
+
+      assert_equal path, browser.media_path
+      assert result[:posted]
+    end
   end
 
   def test_rejects_missing_savepoint

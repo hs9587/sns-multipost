@@ -4,10 +4,12 @@ require "poster/jotter"
 
 class PosterJotterTest < Minitest::Test
   class FakeClient
-    attr_reader :text, :failure_screenshot_path
+    attr_reader :text, :media_paths, :expected_browser_id_fingerprint, :failure_screenshot_path
 
-    def post(text:, failure_screenshot_path: nil)
+    def post(text:, media_paths:, expected_browser_id_fingerprint:, failure_screenshot_path: nil)
       @text = text
+      @media_paths = media_paths
+      @expected_browser_id_fingerprint = expected_browser_id_fingerprint
       @failure_screenshot_path = failure_screenshot_path
       { posted: true, url: "https://jotter.me/ja-JP/jot/#new" }
     end
@@ -19,12 +21,13 @@ class PosterJotterTest < Minitest::Test
     SnsMultipost::Config.new("dry_run" => dry_run)
   end
 
-  def test_posts_text_and_ignores_media_for_v1
+  def test_posts_text_with_first_media_only
     client = FakeClient.new
-    job = Job.new(sns: "jotter", text: "本文", media_paths: ["one.jpg"])
+    job = Job.new(sns: "jotter", text: "本文", media_paths: ["one.jpg", "two.jpg"])
     result = SnsMultipost::Poster::Jotter.new(config, client: client).perform(job)
 
     assert_equal "本文", client.text
+    assert_equal ["one.jpg"], client.media_paths
     assert result[:posted]
   end
 

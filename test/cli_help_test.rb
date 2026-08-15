@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles mixi2_smoke post retry run_queue threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -87,6 +87,38 @@ class CliHelpTest < Minitest::Test
     assert status.success?
     assert_includes stdout, "mixi2への投稿は行いません"
     assert_includes stdout, "ruby bin/browser_login mixi2"
+  end
+
+  def test_jotter_wallet_smoke_help_promises_read_only_wallet_check
+    stdout, _stderr, status = run_cli("jotter_wallet_smoke", "--help")
+    assert status.success?
+    assert_includes stdout, "Browser IDとDEN残高"
+    assert_includes stdout, "投稿、DEN検証要求、送金、振替は行わず"
+    assert_includes stdout, "短いハッシュ"
+  end
+
+  def test_jotter_media_smoke_help_promises_not_to_post_or_pay
+    stdout, _stderr, status = run_cli("jotter_media_smoke", "--help")
+    assert status.success?
+    assert_includes stdout, "画像1枚"
+    assert_includes stdout, "投稿とDEN支払いは行いません"
+    assert_includes stdout, "ruby bin/jotter_media_smoke photo.jpg"
+  end
+
+  def test_jotter_wallet_hold_help_explains_manual_transfer
+    stdout, _stderr, status = run_cli("jotter_wallet_hold", "--help")
+    assert status.success?
+    assert_includes stdout, "手動DEN振替"
+    assert_includes stdout, "Enterを押すまでChromeを保持"
+    assert_includes stdout, "Windowsタスク"
+  end
+
+  def test_jotter_wallet_verify_help_explains_verification_only
+    stdout, _stderr, status = run_cli("jotter_wallet_verify", "--help")
+    assert status.success?
+    assert_includes stdout, "保存済みBrowser IDと一致する場合だけ"
+    assert_includes stdout, "--required DEN"
+    assert_includes stdout, "送金・振替・投稿は行いません"
   end
 
   def test_help_is_compact_without_blank_lines_between_sections

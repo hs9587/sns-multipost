@@ -16,12 +16,13 @@
 - 認証情報とブラウザ状態は Git に入れない
 - 基本実装は Ruby。ブラウザ操作ライブラリは対象サービスごとの実証結果で決める
 
-## 現在の状態（2026-08-11）
+## 現在の状態（2026-08-15）
 
 - Fedibird監視、ファイルキュー、投稿実行、失敗ジョブの再試行からなる基盤は実装・運用確認済み
 - Fedibird / Bluesky / Tumblr / Threads はAPIによる実投稿を確認済み
 - Bloggerは本文のAPI投稿と、専用Chromeによる内部画像ストア保存を組み合わせた画像付き実投稿を確認済み
-- mixi2ポスト、mixiつぶやき、Jotter.me公開テキスト投稿は専用Chromeによる実投稿を確認済み
+- mixi2ポスト、mixiつぶやき、Jotter.me公開テキスト／単画像投稿は専用Chromeによる実投稿を確認済み
+- Jotter.meは専用Browser IDの継続、DEN残高読取り、手動振替の画面保持、未検証DENの検証要求を確認済み
 - Threadsはテキストと単画像を実投稿確認済み。複数画像を1件にまとめる投稿は実装・自動テスト済みだが、実投稿は未確認
 - Tumblrの短命トークンとローテーション型refresh tokenは自動更新・永続化済み
 - Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり
@@ -41,7 +42,7 @@
 | Blogger | 稼働 | 混合方式。本文はGoogle OAuth2 API、画像だけ専用ChromeでBlogger内部ストアへ保存 |
 | mixi | 稼働 | 専用Chrome。つぶやき、本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chrome。本文150文字・画像4枚 |
-| Jotter.me | 稼働 | 専用Chrome。セーブポイント復元後に接続し、公開テキスト投稿とURLを確認 |
+| Jotter.me | 稼働 | 専用Chrome。公開テキストと先頭画像1枚。画像はBrowser IDと利用可能DENを事前確認 |
 | X | APIコード保管・自動投稿保留 | APIは課金せず、公式ルールが禁じるWeb画面の自動操作も行わない |
 | Instagram | 手動引き渡し予定 | 非公開個人アカウントを維持。プロアカウント化とブラウザ自動化は行わない |
 | Facebook | 手動引き渡し予定 | 個人プロフィールは公式投稿APIの対象外。ブラウザ自動化は行わない |
@@ -86,6 +87,9 @@
     ruby bin/mixi_smoke
     ruby bin/mixi2_smoke
     ruby bin/jotter_smoke
+    ruby bin/jotter_wallet_smoke
+    ruby bin/jotter_wallet_hold
+    ruby bin/jotter_wallet_verify
     ruby bin/whoami
 
 設定構造は `config.sample.yml` を参照し、実際の秘密値は Git 管理外の `config.yml` に利用者本人が記入する。
@@ -99,7 +103,7 @@
 監視基準を戻さず `bin/retry` を使う。
 
 ローカル画像を投稿可能な全投稿先へ手動展開する場合、`--image` は `targets.post` のうち
-Fedibird / Bluesky / Tumblr / Blogger / mixi / mixi2のジョブを作る。
+Fedibird / Bluesky / Tumblr / Blogger / mixi / mixi2 / Jotterのジョブを作る。
 ThreadsはMetaが取得できる公開画像URLを必要とするため、
 Fedibird投稿後に `--from-fedibird-latest` でThreadsジョブを追加する。
 
@@ -114,6 +118,13 @@ Fedibird投稿後に `--from-fedibird-latest` でThreadsジョブを追加する
 Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの経路でThreadsと
 Bloggerの単画像投稿を実地確認した。Instagramからの本来の
 波及方法を決めた後に、Threads画像の実運用経路は再検討する。
+
+Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択後に画面が示す必要DENを読み、
+利用可能DENが足りる場合だけ投稿する。利用可能分が時間経過で未検証へ戻ることがあるため、
+画像投稿開始時に利用可能額が90 DEN未満で、未検証分を含めれば足りる場合は自動で検証要求する。
+別ブラウザから専用Chromeへまとめて振り替える場合は `jotter_wallet_hold`、明示的に検証する場合は
+`jotter_wallet_verify` を使う。詳細は
+[Jotter画像投稿とDEN運用](docs/specs/2026-08-15-jotter-image-den.md) を参照。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
 ## ロードマップ
@@ -149,4 +160,5 @@ Blogger編集画面の「パソコンからアップロード」を自動操作�
 API投稿先の実装記録は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、
 Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-threads-api.md)、
 ブラウザ投稿先の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
+Jotter画像とDEN運用は [docs/specs/2026-08-15-jotter-image-den.md](docs/specs/2026-08-15-jotter-image-den.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

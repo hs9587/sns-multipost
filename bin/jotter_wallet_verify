@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "digest"
+require "cli"
+require "config"
+require "jotter_browser"
+require "token_store"
+
+attempts = 3
+timeout = 180
+required = 90
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/jotter_wallet_verify [options]",
+  description: "sns-multipost専用ChromeでJotterの未検証DENへ検証要求し、利用可能になるまで待ちます。\n保存済みBrowser IDと一致する場合だけ実行し、送金・振替・投稿は行いません。",
+  examples: ["ruby bin/jotter_wallet_verify",
+             "ruby bin/jotter_wallet_verify --required 90 --attempts 3 --timeout 180"],
+  notes: ["Browser IDを表示するには、別機または普段のブラウザでも同じ口座のウォレットを開いたまま実行してください。",
+          "--timeoutは検証要求1回ごとの待ち時間です。検証失敗時は--attempts回まで再要求します。",
+          "保持中はWindowsタスクや別のsns-multipostコマンドを実行しないでください。"]
+) do |opts|
+  opts.on("--required DEN", Integer, "必要な利用可能DEN（既定: 90）") { |value| required = value }
+  opts.on("--attempts COUNT", Integer, "検証要求の最大回数（既定: 3）") { |value| attempts = value }
+  opts.on("--timeout SECONDS", Integer, "1回ごとの待機秒数（既定: 180）") { |value| timeout = value }
+end
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+SnsMultipost::Cli.usage_error(parser, "--requiredは1以上") unless required.positive?
+SnsMultipost::Cli.usage_error(parser, "--attemptsは1以上10以下") unless (1..10).cover?(attempts)
+SnsMultipost::Cli.usage_error(parser, "--timeoutは30以上600以下") unless (30..600).cover?(timeout)
+
+config = SnsMultipost::Config.load
+settings = config["jotter"] || {}
+store = SnsMultipost::TokenStore.new(
+  File.expand_path("../state/jotter_wallet.json", __dir__))
+expected = store.load["browser_id_fingerprint"].to_s
+raise "Jotter Browser IDの基準がありません。先にjotter_wallet_smokeを実行してください" if expected.empty?
+
+fingerprint = lambda do |value|
+  text = value.to_s.strip
+  text.empty? ? nil : Digest::SHA256.hexdigest("jotter-wallet-v1\0#{text}")[0, 12]
+end
+client = SnsMultipost::JotterBrowser.new(
+  savepoint_url: settings["savepoint_url"],
+  account_name: settings["account_name"],
+  logger: ->(message) { puts message })
+
+result = client.wallet_verify(
+  required_den: required, attempts: attempts, verification_timeout: timeout) do |initial|
+  current = fingerprint.call(initial["browserId"])
+  raise "Jotter Browser IDが画面に表示されず、専用ブラウザを確認できません" unless current
+  raise "Jotter Browser IDが保存済み基準と一致しません" unless current == expected
+
+  balances = initial["balances"] || {}
+  puts "Browser ID: 保存済み基準と一致（fingerprint=#{current}）"
+  puts "検証前DEN: 利用可能=#{balances['available'] || '不明'} " \
+       "未検証=#{balances['unverified'] || '不明'} " \
+       "要更新=#{balances['needsUpdate'] || '不明'} " \
+       "合計=#{balances['total'] || '不明'}"
+end
+
+balances = result.dig("after", "balances") || {}
+puts "Jotter wallet verify: ok（検証要求#{result['attempts']}回）"
+puts "検証後DEN: 利用可能=#{balances['available'] || '不明'} " \
+     "未検証=#{balances['unverified'] || '不明'} " \
+     "要更新=#{balances['needsUpdate'] || '不明'} " \
+     "合計=#{balances['total'] || '不明'}"
+puts "送金、振替、投稿はしていません。"

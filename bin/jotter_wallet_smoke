@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "digest"
+require "time"
+require "cli"
+require "config"
+require "jotter_browser"
+require "token_store"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/jotter_wallet_smoke [options]",
+  description: "sns-multipost専用ChromeでJotterのBrowser IDとDEN残高を読み取り専用で確認します。\n投稿、DEN検証要求、送金、振替は行わず、確認後にChromeを閉じます。",
+  examples: ["ruby bin/jotter_wallet_smoke"],
+  notes: ["先にconfig.ymlのjotter.savepoint_urlとjotter.account_nameを設定してください。",
+          "口座IDとBrowser IDそのものは表示・保存せず、照合用の短いハッシュだけをstate/へ保存します。",
+          "Browser IDが表示されない場合、別機または普段のブラウザでも同じ口座のウォレットを開いたまま再実行してください。"])
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+
+config = SnsMultipost::Config.load
+settings = config["jotter"] || {}
+result = SnsMultipost::JotterBrowser.new(
+  savepoint_url: settings["savepoint_url"],
+  account_name: settings["account_name"],
+  logger: ->(message) { puts message }).wallet_smoke
+
+fingerprint = lambda do |value|
+  text = value.to_s.strip
+  text.empty? ? nil : Digest::SHA256.hexdigest("jotter-wallet-v1\0#{text}")[0, 12]
+end
+account_fingerprint = fingerprint.call(result["accountId"])
+browser_fingerprint = fingerprint.call(result["browserId"])
+store = SnsMultipost::TokenStore.new(
+  File.expand_path("../state/jotter_wallet.json", __dir__))
+previous = store.load
+
+puts "Jotter wallet smoke: ok"
+if account_fingerprint
+  puts "口座ID: 確認（fingerprint=#{account_fingerprint}）"
+else
+  puts "口座ID: 画面に表示されず未確認"
+end
+
+if browser_fingerprint
+  previous_fingerprint = previous["browser_id_fingerprint"].to_s
+  continuity =
+    if previous_fingerprint.empty?
+      "初回記録"
+    elsif previous_fingerprint == browser_fingerprint
+      "前回と一致"
+    else
+      "前回と不一致（Browser IDが変わった可能性があります）"
+    end
+  puts "Browser ID: 確認（fingerprint=#{browser_fingerprint}、#{continuity}）"
+  store.save(
+    "browser_id_fingerprint" => browser_fingerprint,
+    "account_id_fingerprint" => account_fingerprint,
+    "checked_at" => Time.now.iso8601)
+else
+  puts "Browser ID: 画面に表示されず未確認"
+end
+
+balances = result["balances"] || {}
+puts "DEN: 利用可能=#{balances['available'] || '不明'} " \
+     "未検証=#{balances['unverified'] || '不明'} " \
+     "要更新=#{balances['needsUpdate'] || '不明'} " \
+     "入金予定=#{balances['scheduled'] || '不明'} " \
+     "合計=#{balances['total'] || '不明'}"
+
+if balances.values.compact.empty? || browser_fingerprint.nil?
+  diagnostic = Array(result["diagnostic"])
+  unless diagnostic.empty?
+    puts "画面構造（ID伏字）:"
+    diagnostic.each { |line| puts "  #{line}" }
+  end
+end
+puts "読み取りだけを行いました。投稿、DEN検証要求、送金、振替はしていません。"

@@ -24,8 +24,8 @@ class ManualPostTest < Minitest::Test
       configured: %w[fedibird bluesky tumblr blogger threads mixi mixi2 jotter],
       targets: [], mode: :local_images)
 
-    assert_equal %w[fedibird bluesky tumblr blogger mixi mixi2], selected
-    assert_equal %w[threads jotter], skipped
+    assert_equal %w[fedibird bluesky tumblr blogger mixi mixi2 jotter], selected
+    assert_equal %w[threads], skipped
   end
 
   def test_explicit_unsupported_image_target_raises
