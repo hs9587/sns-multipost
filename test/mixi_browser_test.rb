@@ -2,6 +2,8 @@ require_relative "test_helper"
 require "mixi_browser"
 
 class MixiBrowserTest < Minitest::Test
+  class TransientNodeNotFoundError < StandardError; end
+
   class FakeNode
     def initialize(on_click: nil, on_type: nil, on_select_file: nil)
       @on_click = on_click
@@ -28,8 +30,9 @@ class MixiBrowserTest < Minitest::Test
   class FakeBrowser
     attr_reader :url, :text, :media_path, :screenshot_call
 
-    def initialize(post_url: true)
+    def initialize(post_url: true, stale_actions: [])
       @post_url = post_url
+      @stale_actions = stale_actions.dup
       @photo_open = false
       @posted = false
     end
@@ -54,21 +57,36 @@ class MixiBrowserTest < Minitest::Test
     def at_css(selector)
       case selector
       when SnsMultipost::MixiBrowser::TEXT_SELECTOR
-        FakeNode.new(on_type: ->(text) { @text = text })
+        FakeNode.new(
+          on_click: -> { raise_stale_once(:editor) },
+          on_type: ->(text) { @text = text })
       when SnsMultipost::MixiBrowser::SUBMIT_SELECTOR
-        FakeNode.new(on_click: -> { @posted = true })
+        FakeNode.new(on_click: -> { raise_stale_once(:submit); @posted = true })
       when SnsMultipost::MixiBrowser::PHOTO_INPUT_SELECTOR
-        @photo_open && FakeNode.new(on_select_file: ->(path) { @media_path = path })
+        @photo_open && FakeNode.new(on_select_file: ->(path) {
+          raise_stale_once(:media)
+          @media_path = path
+        })
       end
     end
 
     def at_xpath(selector)
       return unless selector == SnsMultipost::MixiBrowser::PHOTO_LINK_XPATH
-      FakeNode.new(on_click: -> { @photo_open = true })
+      FakeNode.new(on_click: -> { raise_stale_once(:photo_link); @photo_open = true })
     end
 
     def screenshot(path:, full:)
       @screenshot_call = { path: path, full: full }
+    end
+
+    private
+
+    def raise_stale_once(action)
+      index = @stale_actions.index(action)
+      return unless index
+
+      @stale_actions.delete_at(index)
+      raise TransientNodeNotFoundError, "stale #{action}"
     end
   end
 
@@ -94,6 +112,18 @@ class MixiBrowserTest < Minitest::Test
     assert_equal "one.png", browser.media_path
     assert result[:posted]
     assert_equal "https://mixi.jp/view_voice.pl?id=123", result[:url]
+  end
+
+  def test_post_reacquires_nodes_replaced_during_page_updates
+    browser = FakeBrowser.new(stale_actions: %i[editor photo_link media submit])
+
+    result = SnsMultipost::MixiBrowser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+        text: "再取得テスト", media_paths: ["one.png"])
+
+    assert_equal "再取得テスト", browser.text
+    assert_equal "one.png", browser.media_path
+    assert result[:posted]
   end
 
   def test_post_captures_screenshot_when_new_voice_is_missing

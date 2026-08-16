@@ -8,6 +8,7 @@ module SnsMultipost
     SUBMIT_SELECTOR = "#voicePostSubmit".freeze
     PHOTO_LINK_XPATH = "//a[@title='写真を追加']".freeze
     PHOTO_INPUT_SELECTOR = "input[type='file'][name='photo']".freeze
+    NODE_ACTION_ATTEMPTS = 3
 
     STATE_JS = <<~'JS'.freeze
       (() => ({
@@ -60,8 +61,10 @@ module SnsMultipost
     end
 
     def smoke
-      state, editor = open_home
-      editor.click
+      state = open_home
+      with_fresh_node(-> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") do |editor|
+        editor.click
+      end
       open_photo_input
       file_state = wait_for { browser.evaluate(FILE_STATE_JS).then { |s| s if s["present"] } }
       raise "mixiの写真入力が見つかりません" unless file_state
@@ -73,14 +76,16 @@ module SnsMultipost
     end
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
-      _, editor = open_home
-      editor.click.type(text)
+      open_home
+      with_fresh_node(-> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") do |editor|
+        editor.click.type(text)
+      end
 
       unless media_paths.empty?
         open_photo_input
-        media = wait_for { browser.at_css(PHOTO_INPUT_SELECTOR) }
-        raise "mixiの写真入力が見つかりません" unless media
-        media.select_file(media_paths.first)
+        with_fresh_node(-> { browser.at_css(PHOTO_INPUT_SELECTOR) }, "mixiの写真入力が見つかりません") do |media|
+          media.select_file(media_paths.first)
+        end
         attached = wait_for do
           state = browser.evaluate(FILE_STATE_JS)
           state if state["files"] == 1
@@ -89,9 +94,9 @@ module SnsMultipost
       end
 
       existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40])
-      submit = browser.at_css(SUBMIT_SELECTOR)
-      raise "mixiのつぶやくボタンが見つかりません" unless submit
-      submit.click
+      with_fresh_node(-> { browser.at_css(SUBMIT_SELECTOR) }, "mixiのつぶやくボタンが見つかりません") do |submit|
+        submit.click
+      end
 
       confirmation_timeout = media_paths.empty? ? @timeout : [@timeout * 3, 60].max
       url = wait_for(timeout: confirmation_timeout) do
@@ -123,17 +128,38 @@ module SnsMultipost
         raise "mixiにログインしていません（現在URL: #{last_state && last_state['url']}）。" \
               "ruby bin/browser_login mixi を実行してください"
       end
-      editor = browser.at_css(TEXT_SELECTOR)
-      raise "mixiのつぶやき入力欄が見つかりません" unless editor
-      [state, editor]
+      raise "mixiのつぶやき入力欄が見つかりません" unless browser.at_css(TEXT_SELECTOR)
+      state
     end
 
     def open_photo_input
       return if browser.at_css(PHOTO_INPUT_SELECTOR)
 
-      link = browser.at_xpath(PHOTO_LINK_XPATH)
-      raise "mixiの写真追加ボタンが見つかりません" unless link
-      link.click
+      with_fresh_node(-> { browser.at_xpath(PHOTO_LINK_XPATH) }, "mixiの写真追加ボタンが見つかりません") do |link|
+        link.click
+      end
+    end
+
+    def with_fresh_node(finder, missing_message)
+      last_error = nil
+      NODE_ACTION_ATTEMPTS.times do
+        node = wait_for { finder.call }
+        raise missing_message unless node
+
+        begin
+          return yield node
+        rescue StandardError => e
+          raise unless node_not_found_error?(e)
+
+          last_error = e
+          @sleeper.call(0.2)
+        end
+      end
+      raise last_error
+    end
+
+    def node_not_found_error?(error)
+      error.class.name.end_with?("NodeNotFoundError")
     end
 
     def capture_failure_screenshot(path)
