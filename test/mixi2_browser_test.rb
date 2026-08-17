@@ -48,12 +48,14 @@ class Mixi2BrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :url, :quit_called, :text, :media_paths, :network
+    attr_reader :url, :quit_called, :text, :media_paths, :network,
+                :processing_checks
 
-    def initialize(post_url: true)
+    def initialize(post_url: true, processing_checks: 0)
       @composer_open = false
       @submitted = false
       @post_url = post_url
+      @processing_checks = processing_checks
       @network = FakeNetwork.new
     end
 
@@ -75,6 +77,13 @@ class Mixi2BrowserTest < Minitest::Test
         !@text.to_s.empty?
       when SnsMultipost::Mixi2Browser::POST_URL_JS
         @submitted && @post_url ? "https://mixi.social/@me/posts/123" : nil
+      when SnsMultipost::Mixi2Browser::POST_PROCESSING_JS
+        if @processing_checks.positive?
+          @processing_checks -= 1
+          true
+        else
+          false
+        end
       when SnsMultipost::Mixi2Browser::POST_URLS_JS
         []
       when SnsMultipost::Mixi2Browser::ATTACHMENT_STATE_JS
@@ -147,7 +156,7 @@ class Mixi2BrowserTest < Minitest::Test
   end
 
   def test_post_enters_text_attaches_media_and_confirms_completion
-    browser = FakeBrowser.new
+    browser = FakeBrowser.new(processing_checks: 2)
     sleeps = []
     result = SnsMultipost::Mixi2Browser.new(
       browser: browser, timeout: 0, sleeper: ->(seconds) { sleeps << seconds }).post(
@@ -158,8 +167,29 @@ class Mixi2BrowserTest < Minitest::Test
     assert_equal 1, browser.network.wait_options[:connections]
     assert_equal 30, browser.network.wait_options[:timeout]
     assert_equal 2, sleeps.count(SnsMultipost::Mixi2Browser::MEDIA_SETTLE_SECONDS)
+    assert_equal 0, browser.processing_checks
     assert_equal true, result[:posted]
     assert_equal "https://mixi.social/@me/posts/123", result[:url]
+  end
+
+  def test_post_reloads_home_before_giving_up_on_new_url
+    browser = FakeBrowser.new(post_url: false)
+    checks = 0
+    original_evaluate = browser.method(:evaluate)
+    browser.define_singleton_method(:evaluate) do |script, *args|
+      if script == SnsMultipost::Mixi2Browser::POST_URL_JS
+        checks += 1
+        return "https://mixi.social/@me/posts/late" if checks >= 2
+      end
+      original_evaluate.call(script, *args)
+    end
+
+    result = SnsMultipost::Mixi2Browser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+        text: "遅延投稿", media_paths: ["one.jpg"])
+
+    assert_equal "https://mixi.social/@me/posts/late", result[:url]
+    assert_equal SnsMultipost::Mixi2Browser::HOME_URL, browser.url
   end
 
   def test_media_smoke_attaches_media_and_closes_without_posting

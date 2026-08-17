@@ -71,6 +71,14 @@ module SnsMultipost
       })()
     JS
 
+    POST_PROCESSING_JS = <<~'JS'.freeze
+      (() => {
+        const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
+        return text.includes('画像をアップロードしています') ||
+          /uploading\s+(?:the\s+)?image/i.test(text);
+      })()
+    JS
+
     ATTACHMENT_STATE_JS = <<~'JS'.freeze
       (() => {
         const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
@@ -151,7 +159,23 @@ module SnsMultipost
       closed = wait_for { !browser.evaluate(COMPOSER_JS)["opened"] }
       raise "mixi2の投稿完了を確認できません" unless closed
 
-      url = wait_for { browser.evaluate(POST_URL_JS, text[0, 40], existing_urls) }
+      confirmation_timeout = media_paths.empty? ? @timeout : [@timeout * 8, 120].max
+      unless media_paths.empty?
+        uploaded = wait_for(timeout: confirmation_timeout) do
+          !browser.evaluate(POST_PROCESSING_JS)
+        end
+        raise "mixi2の投稿後画像アップロードが完了しません" unless uploaded
+      end
+
+      url = wait_for(timeout: confirmation_timeout) do
+        browser.evaluate(POST_URL_JS, text[0, 40], existing_urls)
+      end
+      unless url
+        browser.goto(HOME_URL)
+        url = wait_for(timeout: confirmation_timeout) do
+          browser.evaluate(POST_URL_JS, text[0, 40], existing_urls)
+        end
+      end
       raise "mixi2の新しい投稿を確認できません" unless url
       { posted: true, url: url }
     rescue StandardError
@@ -279,8 +303,8 @@ module SnsMultipost
       end
     end
 
-    def wait_for
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @timeout
+    def wait_for(timeout: @timeout)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       loop do
         value = yield
         return value if value
