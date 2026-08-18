@@ -30,23 +30,27 @@ class JotterBrowserTest < Minitest::Test
 
   class FakeBrowser
     attr_reader :goto_count, :typed_text, :media_path, :quit_called, :screenshot_call,
-                :confirm_clicked
+                :confirm_clicks
 
     def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false,
-                   home_requires_reset: false)
+                   home_requires_reset: false, confirmation_steps: 1, post_detail: true)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
       @home_requires_reset = home_requires_reset
+      @confirmation_steps = confirmation_steps
+      @post_detail = post_detail
       @home_reset = false
       @goto_count = 0
       @account_open = false
       @composer_open = false
       @submitted = false
+      @confirm_clicks = 0
     end
 
-    def goto(_url)
+    def goto(url)
       @goto_count += 1
+      @url = url
       @account_open = false
       @composer_open = false
     end
@@ -75,7 +79,13 @@ class JotterBrowserTest < Minitest::Test
       when SnsMultipost::JotterBrowser::POST_URLS_JS
         []
       when SnsMultipost::JotterBrowser::POST_URL_JS
-        @submitted && @confirm_clicked && @confirm_post ? "https://jotter.me/ja-JP/jot/#new" : nil
+        @submitted && @confirmation_steps.zero? && @confirm_post ?
+          "https://jotter.me/ja-JP/jot/#new" : nil
+      when SnsMultipost::JotterBrowser::AT_POST_URL_JS
+        @url == _args.first
+      when SnsMultipost::JotterBrowser::POST_DETAIL_JS
+        @post_detail && @url == "https://jotter.me/ja-JP/jot/#new" &&
+          @typed_text.to_s.include?(_args.first.to_s)
       when SnsMultipost::JotterBrowser::WALLET_STATE_JS
         if @den_verified
           return {
@@ -117,9 +127,13 @@ class JotterBrowserTest < Minitest::Test
     end
 
     def at_xpath(selector)
-      return unless selector == SnsMultipost::JotterBrowser::CONFIRM_XPATH && @submitted
+      return unless selector == SnsMultipost::JotterBrowser::CONFIRM_XPATH &&
+                    @submitted && @confirmation_steps.positive?
 
-      FakeNode.new(on_click: -> { @confirm_clicked = true })
+      FakeNode.new(on_click: -> {
+        @confirmation_steps -= 1
+        @confirm_clicks += 1
+      })
     end
 
     def at_css(selector)
@@ -180,9 +194,28 @@ class JotterBrowserTest < Minitest::Test
     result = client(browser).post(text: "Jotterテスト")
 
     assert_equal "Jotterテスト", browser.typed_text
-    assert_equal true, browser.confirm_clicked
+    assert_equal 1, browser.confirm_clicks
     assert_equal true, result[:posted]
     assert_equal "https://jotter.me/ja-JP/jot/#new", result[:url]
+  end
+
+  def test_post_accepts_consecutive_confirmation_steps
+    browser = FakeBrowser.new(confirmation_steps: 2)
+
+    result = client(browser).post(text: "二段階確認")
+
+    assert_equal 2, browser.confirm_clicks
+    assert result[:posted]
+  end
+
+  def test_post_requires_text_on_individual_post_page
+    browser = FakeBrowser.new(post_detail: false)
+
+    error = assert_raises(RuntimeError) do
+      client(browser).post(text: "個別画面確認")
+    end
+
+    assert_match(/個別画面を確認できません/, error.message)
   end
 
   def test_wallet_smoke_reads_ids_and_den_without_posting
@@ -192,7 +225,7 @@ class JotterBrowserTest < Minitest::Test
     assert_equal "account-secret", result["accountId"]
     assert_equal "browser-secret", result["browserId"]
     assert_equal "180", result.dig("balances", "available")
-    refute browser.confirm_clicked
+    assert_equal 0, browser.confirm_clicks
   end
 
   def test_wallet_hold_keeps_browser_open_during_block
@@ -233,7 +266,7 @@ class JotterBrowserTest < Minitest::Test
       assert_equal 1, result["previewCount"]
       assert_equal "90", result["requiredDen"]
       assert_equal ["90 DEN"], result["denLines"]
-      refute browser.confirm_clicked
+      assert_equal 0, browser.confirm_clicks
     end
   end
 

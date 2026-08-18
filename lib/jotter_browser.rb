@@ -12,7 +12,8 @@ module SnsMultipost
     TEXT_SELECTOR = 'textarea[name="text"]'.freeze
     MEDIA_SELECTOR = 'input[type="file"]'.freeze
     SUBMIT_SELECTOR = 'button[type="submit"]'.freeze
-    CONFIRM_XPATH = "//button[normalize-space()='Ok']".freeze
+    CONFIRM_XPATH = "//button[normalize-space()='Ok' or normalize-space()='OK']".freeze
+    MAX_POST_CONFIRMATIONS = 4
     SAVEPOINT_ATTEMPTS = 4
     SAVEPOINT_SETTLE_SECONDS = 30
     AUTH_TIMEOUT = 40
@@ -117,6 +118,19 @@ module SnsMultipost
           }
         }
         return null;
+      })()
+    JS
+
+    AT_POST_URL_JS = <<~'JS'.freeze
+      (() => location.href === arguments[0])()
+    JS
+
+    POST_DETAIL_JS = <<~'JS'.freeze
+      (() => {
+        const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+        const expected = normalize(arguments[0]);
+        return location.pathname.includes('/jot/') && !!location.hash &&
+          normalize(document.body?.innerText).includes(expected);
       })()
     JS
 
@@ -382,14 +396,20 @@ module SnsMultipost
       submit = wait_for { safe_at_css(SUBMIT_SELECTOR) }
       raise "JotterのPostボタンが見つかりません" unless submit
       submit.click
-      confirm = wait_for(timeout: [@timeout, 10].min) { safe_at_xpath(CONFIRM_XPATH) }
-      confirm.click if confirm
 
       expected = text[0, 40]
       url = wait_for(timeout: @confirmation_timeout) do
+        click_post_confirmations
         safe_evaluate(POST_URL_JS, expected, existing_urls)
       end
       raise "Jotterの新しい公開投稿を確認できません" unless url
+
+      browser.goto(url) unless safe_evaluate(AT_POST_URL_JS, url)
+      detail = wait_for(timeout: @confirmation_timeout) do
+        click_post_confirmations
+        safe_evaluate(POST_DETAIL_JS, expected)
+      end
+      raise "Jotterの新しい公開投稿の個別画面を確認できません" unless detail
       { posted: true, url: url }
     rescue StandardError
       capture_failure_screenshot(failure_screenshot_path)
@@ -399,6 +419,20 @@ module SnsMultipost
     end
 
     private
+
+    def click_post_confirmations
+      clicked = 0
+      MAX_POST_CONFIRMATIONS.times do
+        confirm = safe_at_xpath(CONFIRM_XPATH)
+        break unless confirm
+
+        confirm.click
+        clicked += 1
+        @sleeper.call(0.2)
+      end
+      status("Jotter: 投稿確認Ok #{clicked}回") if clicked.positive?
+      clicked
+    end
 
     def den_number(value)
       value.to_s.delete(",").to_i
