@@ -69,7 +69,9 @@ module SnsMultipost
       file_state = wait_for { browser.evaluate(FILE_STATE_JS).then { |s| s if s["present"] } }
       raise "mixiの写真入力が見つかりません" unless file_state
 
-      { "url" => state["url"], "hasText" => true, "hasSubmit" => !!browser.at_css(SUBMIT_SELECTOR),
+      has_submit = with_fresh_node(
+        -> { browser.at_css(SUBMIT_SELECTOR) }, "mixiのつぶやくボタンが見つかりません") { true }
+      { "url" => state["url"], "hasText" => true, "hasSubmit" => has_submit,
         "hasMedia" => true }
     ensure
       browser.quit if @owns_browser && @browser
@@ -128,12 +130,17 @@ module SnsMultipost
         raise "mixiにログインしていません（現在URL: #{last_state && last_state['url']}）。" \
               "ruby bin/browser_login mixi を実行してください"
       end
-      raise "mixiのつぶやき入力欄が見つかりません" unless browser.at_css(TEXT_SELECTOR)
+      with_fresh_node(
+        -> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") { true }
       state
     end
 
     def open_photo_input
-      return if browser.at_css(PHOTO_INPUT_SELECTOR)
+      begin
+        return if browser.at_css(PHOTO_INPUT_SELECTOR)
+      rescue StandardError => e
+        raise unless node_not_found_error?(e)
+      end
 
       with_fresh_node(-> { browser.at_xpath(PHOTO_LINK_XPATH) }, "mixiの写真追加ボタンが見つかりません") do |link|
         link.click
@@ -143,10 +150,9 @@ module SnsMultipost
     def with_fresh_node(finder, missing_message)
       last_error = nil
       NODE_ACTION_ATTEMPTS.times do
-        node = wait_for { finder.call }
-        raise missing_message unless node
-
         begin
+          node = wait_for { finder.call }
+          raise missing_message unless node
           return yield node
         rescue StandardError => e
           raise unless node_not_found_error?(e)

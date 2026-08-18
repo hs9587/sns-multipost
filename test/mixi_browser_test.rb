@@ -57,12 +57,15 @@ class MixiBrowserTest < Minitest::Test
     def at_css(selector)
       case selector
       when SnsMultipost::MixiBrowser::TEXT_SELECTOR
+        raise_stale_once(:editor_find)
         FakeNode.new(
           on_click: -> { raise_stale_once(:editor) },
           on_type: ->(text) { @text = text })
       when SnsMultipost::MixiBrowser::SUBMIT_SELECTOR
+        raise_stale_once(:submit_find)
         FakeNode.new(on_click: -> { raise_stale_once(:submit); @posted = true })
       when SnsMultipost::MixiBrowser::PHOTO_INPUT_SELECTOR
+        raise_stale_once(:media_find)
         @photo_open && FakeNode.new(on_select_file: ->(path) {
           raise_stale_once(:media)
           @media_path = path
@@ -72,6 +75,7 @@ class MixiBrowserTest < Minitest::Test
 
     def at_xpath(selector)
       return unless selector == SnsMultipost::MixiBrowser::PHOTO_LINK_XPATH
+      raise_stale_once(:photo_link_find)
       FakeNode.new(on_click: -> { raise_stale_once(:photo_link); @photo_open = true })
     end
 
@@ -115,7 +119,9 @@ class MixiBrowserTest < Minitest::Test
   end
 
   def test_post_reacquires_nodes_replaced_during_page_updates
-    browser = FakeBrowser.new(stale_actions: %i[editor photo_link media submit])
+    browser = FakeBrowser.new(stale_actions: %i[
+      editor_find editor photo_link_find photo_link media_find media submit_find submit
+    ])
 
     result = SnsMultipost::MixiBrowser.new(
       browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
