@@ -14,6 +14,7 @@ module SnsMultipost
     SUBMIT_SELECTOR = 'button[type="submit"]'.freeze
     CONFIRM_XPATH = "//button[normalize-space()='Ok' or normalize-space()='OK']".freeze
     MAX_POST_CONFIRMATIONS = 4
+    NODE_ACTION_ATTEMPTS = 3
     SAVEPOINT_ATTEMPTS = 4
     SAVEPOINT_SETTLE_SECONDS = 30
     AUTH_TIMEOUT = 40
@@ -338,11 +339,9 @@ module SnsMultipost
       raise "Jotterの公開範囲を「公開」にできません" unless safe_evaluate(SET_PUBLIC_JS)
 
       before = safe_evaluate(MEDIA_STATE_JS) || {}
-      input = wait_for do
-        safe_at_css('input[type="file"][accept*="image"]') || safe_at_css(MEDIA_SELECTOR)
-      end
-      raise "Jotterの画像入力欄が見つかりません" unless input
-      input.select_file(absolute)
+      with_fresh_node(
+        -> { safe_at_css('input[type="file"][accept*="image"]') || safe_at_css(MEDIA_SELECTOR) },
+        "Jotterの画像入力欄が見つかりません") { |input| input.select_file(absolute) }
 
       attached = wait_for(timeout: [@auth_timeout, 60].max) do
         state = safe_evaluate(MEDIA_STATE_JS)
@@ -375,9 +374,10 @@ module SnsMultipost
         safe_evaluate(OPEN_COMPOSER_JS)
       }
 
-      editor = wait_for { safe_at_css(TEXT_SELECTOR) }
-      raise "Jotterの本文入力欄が見つかりません" unless editor
-      editor.click.type(text)
+      with_fresh_node(
+        -> { safe_at_css(TEXT_SELECTOR) }, "Jotterの本文入力欄が見つかりません") do |editor|
+        editor.click.type(text)
+      end
       raise "Jotterの公開範囲を「公開」にできません" unless safe_evaluate(SET_PUBLIC_JS)
 
       unless paths.empty?
@@ -426,8 +426,12 @@ module SnsMultipost
         confirm = safe_at_xpath(CONFIRM_XPATH)
         break unless confirm
 
-        confirm.click
-        clicked += 1
+        begin
+          confirm.click
+          clicked += 1
+        rescue StandardError => e
+          raise unless node_not_found_error?(e)
+        end
         @sleeper.call(0.2)
       end
       status("Jotter: 投稿確認Ok #{clicked}回") if clicked.positive?
@@ -504,12 +508,9 @@ module SnsMultipost
       raise "Jotter画像ファイルが見つかりません: #{path}" unless File.file?(absolute)
 
       before = safe_evaluate(MEDIA_STATE_JS) || {}
-      input = wait_for do
-        safe_at_css('input[type="file"][accept*="image"]') || safe_at_css(MEDIA_SELECTOR)
-      end
-      raise "Jotterの画像入力欄が見つかりません" unless input
-
-      input.select_file(absolute)
+      with_fresh_node(
+        -> { safe_at_css('input[type="file"][accept*="image"]') || safe_at_css(MEDIA_SELECTOR) },
+        "Jotterの画像入力欄が見つかりません") { |input| input.select_file(absolute) }
       attached = wait_for(timeout: [@auth_timeout, 60].max) do
         candidate = safe_evaluate(MEDIA_STATE_JS)
         candidate if candidate && (candidate["fileCount"].to_i.positive? ||
@@ -519,6 +520,28 @@ module SnsMultipost
 
       @sleeper.call(3)
       safe_evaluate(MEDIA_STATE_JS) || attached
+    end
+
+    def with_fresh_node(finder, missing_message)
+      last_error = nil
+      NODE_ACTION_ATTEMPTS.times do
+        node = wait_for { finder.call }
+        raise missing_message unless node
+
+        begin
+          return yield node
+        rescue StandardError => e
+          raise unless node_not_found_error?(e)
+
+          last_error = e
+          @sleeper.call(0.2)
+        end
+      end
+      raise last_error
+    end
+
+    def node_not_found_error?(error)
+      error.class.name.end_with?("NodeNotFoundError")
     end
 
     def open_wallet_state(require_browser_id: true)

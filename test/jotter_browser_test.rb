@@ -2,6 +2,8 @@ require_relative "test_helper"
 require "jotter_browser"
 
 class JotterBrowserTest < Minitest::Test
+  class TransientNodeNotFoundError < StandardError; end
+
   class FakeNode
     attr_reader :text
 
@@ -33,13 +35,15 @@ class JotterBrowserTest < Minitest::Test
                 :confirm_clicks
 
     def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false,
-                   home_requires_reset: false, confirmation_steps: 1, post_detail: true)
+                   home_requires_reset: false, confirmation_steps: 1, post_detail: true,
+                   stale_actions: [])
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
       @home_requires_reset = home_requires_reset
       @confirmation_steps = confirmation_steps
       @post_detail = post_detail
+      @stale_actions = stale_actions.dup
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -131,6 +135,7 @@ class JotterBrowserTest < Minitest::Test
                     @submitted && @confirmation_steps.positive?
 
       FakeNode.new(on_click: -> {
+        raise_stale_once(:confirm)
         @confirmation_steps -= 1
         @confirm_clicks += 1
       })
@@ -140,11 +145,16 @@ class JotterBrowserTest < Minitest::Test
       return nil unless @composer_open
       case selector
       when SnsMultipost::JotterBrowser::TEXT_SELECTOR
-        FakeNode.new(on_type: ->(text) { @typed_text = text })
+        FakeNode.new(
+          on_click: -> { raise_stale_once(:editor) },
+          on_type: ->(text) { @typed_text = text })
       when SnsMultipost::JotterBrowser::SUBMIT_SELECTOR
         FakeNode.new(on_click: -> { @submitted = true })
       when 'input[type="file"][accept*="image"]', SnsMultipost::JotterBrowser::MEDIA_SELECTOR
-        FakeNode.new(on_select_file: ->(path) { @media_path = path })
+        FakeNode.new(on_select_file: ->(path) {
+          raise_stale_once(:media)
+          @media_path = path
+        })
       end
     end
 
@@ -154,6 +164,16 @@ class JotterBrowserTest < Minitest::Test
 
     def screenshot(path:, full:)
       @screenshot_call = { path: path, full: full }
+    end
+
+    private
+
+    def raise_stale_once(action)
+      index = @stale_actions.index(action)
+      return unless index
+
+      @stale_actions.delete_at(index)
+      raise TransientNodeNotFoundError, "stale #{action}"
     end
   end
 
@@ -206,6 +226,23 @@ class JotterBrowserTest < Minitest::Test
 
     assert_equal 2, browser.confirm_clicks
     assert result[:posted]
+  end
+
+  def test_image_post_reacquires_nodes_replaced_before_submit
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "one.png")
+      File.binwrite(path, "one")
+      browser = FakeBrowser.new(stale_actions: %i[editor media confirm])
+      expected = Digest::SHA256.hexdigest("jotter-wallet-v1\0browser-secret")[0, 12]
+
+      result = client(browser).post(
+        text: "再取得テスト", media_paths: [path],
+        expected_browser_id_fingerprint: expected)
+
+      assert_equal "再取得テスト", browser.typed_text
+      assert_equal path, browser.media_path
+      assert result[:posted]
+    end
   end
 
   def test_post_requires_text_on_individual_post_page
