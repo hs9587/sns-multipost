@@ -44,7 +44,14 @@ class MixiBrowserTest < Minitest::Test
     def evaluate(script, *_args)
       case script
       when SnsMultipost::MixiBrowser::STATE_JS
-        { "url" => @url, "loggedIn" => true }
+        { "url" => @url, "loggedIn" => true, "hasText" => true, "hasSubmit" => true }
+      when SnsMultipost::MixiBrowser::SET_TEXT_JS
+        @text = _args.first
+        true
+      when SnsMultipost::MixiBrowser::OPEN_PHOTO_INPUT_JS
+        @photo_open = true
+      when SnsMultipost::MixiBrowser::CLICK_SUBMIT_JS
+        @posted = true
       when SnsMultipost::MixiBrowser::FILE_STATE_JS
         { "present" => @photo_open, "files" => @media_path ? 1 : 0 }
       when SnsMultipost::MixiBrowser::POST_URLS_JS
@@ -118,10 +125,8 @@ class MixiBrowserTest < Minitest::Test
     assert_equal "https://mixi.jp/view_voice.pl?id=123", result[:url]
   end
 
-  def test_post_reacquires_nodes_replaced_during_page_updates
-    browser = FakeBrowser.new(stale_actions: %i[
-      editor_find editor photo_link_find photo_link media_find media submit_find submit
-    ])
+  def test_post_uses_atomic_dom_actions_and_reacquires_media_input
+    browser = FakeBrowser.new(stale_actions: %i[media_find media])
 
     result = SnsMultipost::MixiBrowser.new(
       browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(

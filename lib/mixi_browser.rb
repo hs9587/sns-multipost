@@ -13,8 +13,44 @@ module SnsMultipost
     STATE_JS = <<~'JS'.freeze
       (() => ({
         url: location.href,
-        loggedIn: !!document.querySelector('#voiceComment')
+        loggedIn: !!document.querySelector('#voiceComment'),
+        hasText: !!document.querySelector('#voiceComment'),
+        hasSubmit: !!document.querySelector('#voicePostSubmit')
       }))()
+    JS
+
+    SET_TEXT_JS = <<~'JS'.freeze
+      (() => {
+        const input = document.querySelector('#voiceComment');
+        const text = arguments[0];
+        if (!input) return false;
+        input.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        if (setter) setter.call(input, text); else input.value = text;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+        return input.value === text;
+      })()
+    JS
+
+    OPEN_PHOTO_INPUT_JS = <<~'JS'.freeze
+      (() => {
+        if (document.querySelector("input[type='file'][name='photo']")) return true;
+        const link = document.querySelector("a[title='写真を追加']");
+        if (!link) return false;
+        link.click();
+        return true;
+      })()
+    JS
+
+    CLICK_SUBMIT_JS = <<~'JS'.freeze
+      (() => {
+        const submit = document.querySelector('#voicePostSubmit');
+        if (!submit || submit.disabled) return false;
+        submit.click();
+        return true;
+      })()
     JS
 
     POST_URLS_JS = <<~'JS'.freeze
@@ -62,16 +98,11 @@ module SnsMultipost
 
     def smoke
       state = open_home
-      with_fresh_node(-> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") do |editor|
-        editor.click
-      end
       open_photo_input
       file_state = wait_for { browser.evaluate(FILE_STATE_JS).then { |s| s if s["present"] } }
       raise "mixiの写真入力が見つかりません" unless file_state
 
-      has_submit = with_fresh_node(
-        -> { browser.at_css(SUBMIT_SELECTOR) }, "mixiのつぶやくボタンが見つかりません") { true }
-      { "url" => state["url"], "hasText" => true, "hasSubmit" => has_submit,
+      { "url" => state["url"], "hasText" => state["hasText"], "hasSubmit" => state["hasSubmit"],
         "hasMedia" => true }
     ensure
       browser.quit if @owns_browser && @browser
@@ -79,9 +110,8 @@ module SnsMultipost
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
       open_home
-      with_fresh_node(-> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") do |editor|
-        editor.click.type(text)
-      end
+      entered = wait_for { browser.evaluate(SET_TEXT_JS, text) }
+      raise "mixiのつぶやき本文を入力できません" unless entered
 
       unless media_paths.empty?
         open_photo_input
@@ -96,9 +126,8 @@ module SnsMultipost
       end
 
       existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40])
-      with_fresh_node(-> { browser.at_css(SUBMIT_SELECTOR) }, "mixiのつぶやくボタンが見つかりません") do |submit|
-        submit.click
-      end
+      submitted = wait_for { browser.evaluate(CLICK_SUBMIT_JS) }
+      raise "mixiのつぶやくボタンを押せません" unless submitted
 
       confirmation_timeout = media_paths.empty? ? @timeout : [@timeout * 3, 60].max
       url = wait_for(timeout: confirmation_timeout) do
@@ -130,21 +159,12 @@ module SnsMultipost
         raise "mixiにログインしていません（現在URL: #{last_state && last_state['url']}）。" \
               "ruby bin/browser_login mixi を実行してください"
       end
-      with_fresh_node(
-        -> { browser.at_css(TEXT_SELECTOR) }, "mixiのつぶやき入力欄が見つかりません") { true }
       state
     end
 
     def open_photo_input
-      begin
-        return if browser.at_css(PHOTO_INPUT_SELECTOR)
-      rescue StandardError => e
-        raise unless node_not_found_error?(e)
-      end
-
-      with_fresh_node(-> { browser.at_xpath(PHOTO_LINK_XPATH) }, "mixiの写真追加ボタンが見つかりません") do |link|
-        link.click
-      end
+      opened = wait_for { browser.evaluate(OPEN_PHOTO_INPUT_JS) }
+      raise "mixiの写真追加ボタンが見つかりません" unless opened
     end
 
     def with_fresh_node(finder, missing_message)
