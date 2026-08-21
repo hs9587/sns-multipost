@@ -8,7 +8,9 @@ module SnsMultipost
     SUBMIT_SELECTOR = "#voicePostSubmit".freeze
     PHOTO_LINK_XPATH = "//a[@title='写真を追加']".freeze
     PHOTO_INPUT_SELECTOR = "input[type='file'][name='photo']".freeze
-    NODE_ACTION_ATTEMPTS = 3
+    NODE_ACTION_ATTEMPTS = 8
+    PHOTO_INPUT_SETTLE_SECONDS = 1
+    NODE_ACTION_RETRY_SECONDS = 1
 
     STATE_JS = <<~'JS'.freeze
       (() => ({
@@ -115,6 +117,7 @@ module SnsMultipost
 
       unless media_paths.empty?
         open_photo_input
+        @sleeper.call(PHOTO_INPUT_SETTLE_SECONDS)
         with_fresh_node(-> { browser.at_css(PHOTO_INPUT_SELECTOR) }, "mixiの写真入力が見つかりません") do |media|
           media.select_file(media_paths.first)
         end
@@ -178,7 +181,7 @@ module SnsMultipost
           raise unless node_not_found_error?(e)
 
           last_error = e
-          @sleeper.call(0.2)
+          @sleeper.call(NODE_ACTION_RETRY_SECONDS)
         end
       end
       raise last_error

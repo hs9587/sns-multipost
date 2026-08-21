@@ -126,7 +126,7 @@ class MixiBrowserTest < Minitest::Test
   end
 
   def test_post_uses_atomic_dom_actions_and_reacquires_media_input
-    browser = FakeBrowser.new(stale_actions: %i[media_find media])
+    browser = FakeBrowser.new(stale_actions: [:media_find] + Array.new(6, :media))
 
     result = SnsMultipost::MixiBrowser.new(
       browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
