@@ -3,6 +3,10 @@ require_relative "poster/base"
 
 module SnsMultipost
   class Runner
+    def self.exit_status(results)
+      results.any? { |result| result[1] == :failed } ? 1 : 0
+    end
+
     def initialize(config:, queue:)
       @config = config
       @queue = queue

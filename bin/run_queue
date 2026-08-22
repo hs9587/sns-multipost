@@ -14,6 +14,7 @@ parser = SnsMultipost::Cli.parser(
           "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
           "Blogger画像には事前の browser_login blogger と、Chromeを操作できるログオン中の実行環境が必要です。",
           "別のrun_queueまたはretryが実行中なら、二重投稿を避けるため処理せず終了します。",
+          "1件でも投稿に失敗した場合は終了コード1、全件成功または処理対象なしの場合は0を返します。",
           "dry_run: false の場合は実投稿します。",
           "dry_run: true でも処理したジョブは done/ へ移動します。"])
 SnsMultipost::Cli.parse!(parser)
@@ -32,4 +33,7 @@ unless acquired
   puts "skip: another run_queue or retry is active"
   exit 0
 end
-puts "ok=#{results.count { |r| r[1] == :ok }} failed=#{results.count { |r| r[1] == :failed }}"
+ok_count = results.count { |result| result[1] == :ok }
+failed_count = results.count { |result| result[1] == :failed }
+puts "ok=#{ok_count} failed=#{failed_count}"
+exit SnsMultipost::Runner.exit_status(results)

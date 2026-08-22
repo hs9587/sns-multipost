@@ -5,6 +5,19 @@ require "job_queue"
 require "poster/all"
 
 class RunnerTest < Minitest::Test
+  def test_exit_status_is_zero_when_all_jobs_succeed
+    results = [[Object.new, :ok, {}], [Object.new, :ok, {}]]
+
+    assert_equal 0, SnsMultipost::Runner.exit_status(results)
+    assert_equal 0, SnsMultipost::Runner.exit_status([])
+  end
+
+  def test_exit_status_is_one_when_any_job_fails
+    results = [[Object.new, :ok, {}], [Object.new, :failed, "error"]]
+
+    assert_equal 1, SnsMultipost::Runner.exit_status(results)
+  end
+
   def test_ok_and_failed_jobs_move_to_their_dirs
     Dir.mktmpdir do |dir|
       config = SnsMultipost::Config.new({ "dry_run" => true })
