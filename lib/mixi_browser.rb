@@ -57,9 +57,10 @@ module SnsMultipost
 
     POST_URLS_JS = <<~'JS'.freeze
       (() => {
-        const expected = arguments[0];
+        const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+        const expected = normalize(arguments[0]);
         return Array.from(document.querySelectorAll('p.description'))
-          .filter((body) => body.textContent.includes(expected))
+          .filter((body) => normalize(body.textContent).includes(expected))
           .map((body) => (body.closest('li, article') || body.parentElement)
             ?.querySelector('a[href*="view_voice.pl"]'))
           .filter(Boolean)
@@ -69,10 +70,11 @@ module SnsMultipost
 
     POST_URL_JS = <<~'JS'.freeze
       (() => {
-        const expected = arguments[0];
+        const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+        const expected = normalize(arguments[0]);
         const excluded = new Set(arguments[1] || []);
         return Array.from(document.querySelectorAll('p.description'))
-          .filter((body) => body.textContent.includes(expected))
+          .filter((body) => normalize(body.textContent).includes(expected))
           .map((body) => (body.closest('li, article') || body.parentElement)
             ?.querySelector('a[href*="view_voice.pl"]'))
           .filter(Boolean)
@@ -128,17 +130,18 @@ module SnsMultipost
         raise "mixiの画像選択を確認できません: #{media_paths.first}" unless attached
       end
 
-      existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40])
+      expected = normalize_match_text(text)[0, 40]
+      existing_urls = browser.evaluate(POST_URLS_JS, expected)
       submitted = wait_for { browser.evaluate(CLICK_SUBMIT_JS) }
       raise "mixiのつぶやくボタンを押せません" unless submitted
 
       confirmation_timeout = media_paths.empty? ? @timeout : [@timeout * 3, 60].max
       url = wait_for(timeout: confirmation_timeout) do
-        browser.evaluate(POST_URL_JS, text[0, 40], existing_urls)
+        browser.evaluate(POST_URL_JS, expected, existing_urls)
       end
       unless url
         browser.goto(HOME_URL)
-        url = wait_for { browser.evaluate(POST_URL_JS, text[0, 40], existing_urls) }
+        url = wait_for { browser.evaluate(POST_URL_JS, expected, existing_urls) }
       end
       raise "mixiの新しいつぶやきを確認できません" unless url
       { posted: true, url: url }
@@ -150,6 +153,10 @@ module SnsMultipost
     end
 
     private
+
+    def normalize_match_text(text)
+      text.to_s.gsub(/\s+/, " ").strip
+    end
 
     def open_home
       browser.goto(HOME_URL)

@@ -28,7 +28,7 @@ class MixiBrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :url, :text, :media_path, :screenshot_call
+    attr_reader :url, :text, :media_path, :screenshot_call, :match_text
 
     def initialize(post_url: true, stale_actions: [])
       @post_url = post_url
@@ -55,8 +55,10 @@ class MixiBrowserTest < Minitest::Test
       when SnsMultipost::MixiBrowser::FILE_STATE_JS
         { "present" => @photo_open, "files" => @media_path ? 1 : 0 }
       when SnsMultipost::MixiBrowser::POST_URLS_JS
+        @match_text = _args.first
         []
       when SnsMultipost::MixiBrowser::POST_URL_JS
+        @match_text = _args.first
         @posted && @post_url ? "https://mixi.jp/view_voice.pl?id=123" : nil
       end
     end
@@ -123,6 +125,17 @@ class MixiBrowserTest < Minitest::Test
     assert_equal "one.png", browser.media_path
     assert result[:posted]
     assert_equal "https://mixi.jp/view_voice.pl?id=123", result[:url]
+  end
+
+  def test_post_normalizes_whitespace_for_confirmation
+    browser = FakeBrowser.new
+
+    result = SnsMultipost::MixiBrowser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+        text: "おはようございます\nデミタルマフィン   アイスコーヒー。")
+
+    assert_equal "おはようございます デミタルマフィン アイスコーヒー。", browser.match_text
+    assert result[:posted]
   end
 
   def test_post_uses_atomic_dom_actions_and_reacquires_media_input
