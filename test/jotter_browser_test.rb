@@ -255,6 +255,14 @@ class JotterBrowserTest < Minitest::Test
     assert_match(/個別画面を確認できません/, error.message)
   end
 
+  def test_individual_post_check_accepts_doc_and_hash_routes
+    script = SnsMultipost::JotterBrowser::POST_DETAIL_JS
+
+    assert_includes script, "location.pathname.includes('/jot/')"
+    assert_includes script, "location.pathname.includes('/doc/')"
+    assert_includes script, "!!location.hash"
+  end
+
   def test_wallet_smoke_reads_ids_and_den_without_posting
     browser = FakeBrowser.new
     result = client(browser).wallet_smoke

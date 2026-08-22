@@ -130,7 +130,9 @@ module SnsMultipost
       (() => {
         const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
         const expected = normalize(arguments[0]);
-        return location.pathname.includes('/jot/') && !!location.hash &&
+        const individual = location.pathname.includes('/jot/') ||
+          location.pathname.includes('/doc/') || !!location.hash;
+        return individual &&
           normalize(document.body?.innerText).includes(expected);
       })()
     JS
