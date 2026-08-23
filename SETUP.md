@@ -132,12 +132,14 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
     echo [%date% %time%] start cwd=%CD%>>"%LOG%"
     "%RUBY%" "%REPO%\bin\watch"     >>"%LOG%" 2>&1
     "%RUBY%" "%REPO%\bin\run_queue" >>"%LOG%" 2>&1
-    set "RUN_QUEUE_STATUS=%ERRORLEVEL%"
-    if not "%RUN_QUEUE_STATUS%"=="0" (
-      echo [%date% %time%] WARNING: run_queue failed; review failed\ and the log before manual retry.>>"%LOG%"
-    )
-    echo [%date% %time%] end run_queue_exit=%RUN_QUEUE_STATUS%>>"%LOG%"
-    exit /b %RUN_QUEUE_STATUS%
+    if errorlevel 1 goto run_queue_failed
+    echo [%date% %time%] end run_queue_exit=0>>"%LOG%"
+    exit /b 0
+
+    :run_queue_failed
+    echo [%date% %time%] WARNING: run_queue failed; review failed\ and the log before manual retry.>>"%LOG%"
+    echo [%date% %time%] end run_queue_exit=1>>"%LOG%"
+    exit /b 1
 
 `<RUBY>` は `(Get-Command ruby).Source` の入っているディレクトリ（例 `C:\Ruby33-x64\bin`）。
 `run_queue` は1件でも失敗すると終了コード1を返す。バッチは警告を記録して同じ終了コードを
