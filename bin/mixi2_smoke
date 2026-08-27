@@ -13,8 +13,10 @@ SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
 
 result = SnsMultipost::Mixi2Browser.new.smoke
-if result.values_at("opened", "hasEditor", "hasSubmit", "hasMedia").all?
+if result.values_at("opened", "hasEditor", "hasSubmit", "hasMedia").all? &&
+   !result["accountHandle"].to_s.empty?
   puts "mixi2 smoke test: ok"
+  puts "ログイン中アカウント: @#{result['accountHandle']}"
   puts "ログイン状態と投稿画面（本文・送信・メディア添付）を確認しました。"
 else
   raise "mixi2投稿画面の構成が想定と違います: #{result.inspect}"

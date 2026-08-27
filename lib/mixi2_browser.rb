@@ -11,11 +11,19 @@ module SnsMultipost
     MEDIA_SETTLE_SECONDS = 30
 
     STATE_JS = <<~'JS'.freeze
-      (() => ({
-        url: location.href,
-        loggedIn: Array.from(document.querySelectorAll('button'))
-          .some((button) => button.textContent.trim() === 'ポスト')
-      }))()
+      (() => {
+        const profile = Array.from(
+          document.querySelectorAll('a[aria-label="プロフィール"][href^="/@"]')
+        ).find((link) => link.getClientRects().length > 0);
+        const path = profile ? new URL(profile.getAttribute('href'), location.origin).pathname : '';
+        const match = path.match(/^\/@([^/]+)\/?$/);
+        return {
+          url: location.href,
+          loggedIn: Array.from(document.querySelectorAll('button'))
+            .some((button) => button.textContent.trim() === 'ポスト'),
+          accountHandle: match ? match[1] : null
+        };
+      })()
     JS
 
     COMPOSER_JS = <<~'JS'.freeze
@@ -59,14 +67,23 @@ module SnsMultipost
       (() => {
         const expected = arguments[0];
         const excluded = new Set(arguments[1] || []);
+        const account = arguments[2];
         const article = Array.from(document.querySelectorAll('article'))
           .find((candidate) => {
             if (!candidate.textContent.includes(expected)) return false;
-            const link = candidate.querySelector('a[href*="/posts/"]');
+            const link = Array.from(candidate.querySelectorAll('a[href*="/posts/"]'))
+              .find((candidateLink) => {
+                const path = new URL(candidateLink.getAttribute('href'), location.origin).pathname;
+                return path.startsWith(`/@${account}/posts/`);
+              });
             const url = link && new URL(link.getAttribute('href'), location.origin).href;
             return url && !excluded.has(url);
           });
-        const link = article && article.querySelector('a[href*="/posts/"]');
+        const link = article && Array.from(article.querySelectorAll('a[href*="/posts/"]'))
+          .find((candidateLink) => {
+            const path = new URL(candidateLink.getAttribute('href'), location.origin).pathname;
+            return path.startsWith(`/@${account}/posts/`);
+          });
         return link ? new URL(link.getAttribute('href'), location.origin).href : null;
       })()
     JS
@@ -129,13 +146,14 @@ module SnsMultipost
       state, composer, = open_composer
 
       raise "mixi2の投稿画面を閉じられません" unless browser.evaluate(CLOSE_COMPOSER_JS)
-      composer.merge("url" => state["url"])
+      composer.merge("url" => state["url"], "accountHandle" => state["accountHandle"])
     ensure
       browser.quit if @owns_browser && @browser
     end
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
-      _, _, composer = open_composer
+      state, _, composer = open_composer
+      account_handle = state["accountHandle"]
 
       editor = composer.at_css(EDITOR_SELECTOR)
       raise "mixi2の本文欄が見つかりません" unless editor
@@ -150,7 +168,7 @@ module SnsMultipost
       ready = wait_for { browser.evaluate(SUBMIT_READY_JS) }
       raise "mixi2の送信ボタンが有効になりません" unless ready
 
-      existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40])
+      existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40], account_handle)
 
       submit = composer.at_css(SUBMIT_SELECTOR)
       raise "mixi2の送信ボタンが見つかりません" unless submit
@@ -168,16 +186,16 @@ module SnsMultipost
       end
 
       url = wait_for(timeout: confirmation_timeout) do
-        browser.evaluate(POST_URL_JS, text[0, 40], existing_urls)
+        browser.evaluate(POST_URL_JS, text[0, 40], existing_urls, account_handle)
       end
       unless url
         browser.goto(HOME_URL)
         url = wait_for(timeout: confirmation_timeout) do
-          browser.evaluate(POST_URL_JS, text[0, 40], existing_urls)
+          browser.evaluate(POST_URL_JS, text[0, 40], existing_urls, account_handle)
         end
       end
       raise "mixi2の新しい投稿を確認できません" unless url
-      { posted: true, url: url }
+      { posted: true, url: url, account: "@#{account_handle}" }
     rescue StandardError
       capture_failure_screenshot(failure_screenshot_path)
       raise
@@ -188,9 +206,14 @@ module SnsMultipost
     POST_URLS_JS = <<~'JS'.freeze
       (() => {
         const expected = arguments[0];
+        const account = arguments[1];
         return Array.from(document.querySelectorAll('article'))
           .filter((candidate) => candidate.textContent.includes(expected))
-          .map((candidate) => candidate.querySelector('a[href*="/posts/"]'))
+          .map((candidate) => Array.from(candidate.querySelectorAll('a[href*="/posts/"]'))
+            .find((link) => {
+              const path = new URL(link.getAttribute('href'), location.origin).pathname;
+              return path.startsWith(`/@${account}/posts/`);
+            }))
           .filter(Boolean)
           .map((link) => new URL(link.getAttribute('href'), location.origin).href);
       })()
@@ -218,6 +241,9 @@ module SnsMultipost
         current_url = last_state && last_state["url"]
         raise "mixi2にログインしていません（現在URL: #{current_url}）。" \
               "ruby bin/browser_login mixi2 を実行してください"
+      end
+      unless state["accountHandle"].to_s.match?(/\A[0-9A-Za-z_]+\z/)
+        raise "mixi2のログイン中アカウントを確認できません"
       end
 
       post_button = wait_for do

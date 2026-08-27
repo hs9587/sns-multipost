@@ -49,7 +49,7 @@ class Mixi2BrowserTest < Minitest::Test
 
   class FakeBrowser
     attr_reader :url, :quit_called, :text, :media_paths, :network,
-                :processing_checks
+                :processing_checks, :post_url_args, :post_urls_args
 
     def initialize(post_url: true, processing_checks: 0)
       @composer_open = false
@@ -63,10 +63,10 @@ class Mixi2BrowserTest < Minitest::Test
       @url = url
     end
 
-    def evaluate(script, *_args)
+    def evaluate(script, *args)
       case script
       when SnsMultipost::Mixi2Browser::STATE_JS
-        { "url" => @url, "loggedIn" => true }
+        { "url" => @url, "loggedIn" => true, "accountHandle" => "me" }
       when SnsMultipost::Mixi2Browser::CLOSE_COMPOSER_JS
         @composer_open = false
         true
@@ -76,6 +76,7 @@ class Mixi2BrowserTest < Minitest::Test
       when SnsMultipost::Mixi2Browser::SUBMIT_READY_JS
         !@text.to_s.empty?
       when SnsMultipost::Mixi2Browser::POST_URL_JS
+        @post_url_args = args
         @submitted && @post_url ? "https://mixi.social/@me/posts/123" : nil
       when SnsMultipost::Mixi2Browser::POST_PROCESSING_JS
         if @processing_checks.positive?
@@ -85,6 +86,7 @@ class Mixi2BrowserTest < Minitest::Test
           false
         end
       when SnsMultipost::Mixi2Browser::POST_URLS_JS
+        @post_urls_args = args
         []
       when SnsMultipost::Mixi2Browser::ATTACHMENT_STATE_JS
         { "files" => @media_paths.to_a.empty? ? 0 : 1,
@@ -138,6 +140,7 @@ class Mixi2BrowserTest < Minitest::Test
     assert result["hasEditor"]
     assert result["hasSubmit"]
     assert result["mediaMultiple"]
+    assert_equal "me", result["accountHandle"]
     refute browser.quit_called
   end
 
@@ -170,6 +173,28 @@ class Mixi2BrowserTest < Minitest::Test
     assert_equal 0, browser.processing_checks
     assert_equal true, result[:posted]
     assert_equal "https://mixi.social/@me/posts/123", result[:url]
+    assert_equal "@me", result[:account]
+    assert_equal ["おはようございます", "me"], browser.post_urls_args
+    assert_equal ["おはようございます", [], "me"], browser.post_url_args
+  end
+
+  def test_post_rejects_session_without_identifiable_account
+    browser = FakeBrowser.new
+    original_evaluate = browser.method(:evaluate)
+    browser.define_singleton_method(:evaluate) do |script, *args|
+      if script == SnsMultipost::Mixi2Browser::STATE_JS
+        return { "url" => url, "loggedIn" => true, "accountHandle" => nil }
+      end
+      original_evaluate.call(script, *args)
+    end
+
+    error = assert_raises(RuntimeError) do
+      SnsMultipost::Mixi2Browser.new(
+        browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(text: "本文")
+    end
+
+    assert_match(/ログイン中アカウントを確認できません/, error.message)
+    refute browser.instance_variable_get(:@submitted)
   end
 
   def test_post_reloads_home_before_giving_up_on_new_url

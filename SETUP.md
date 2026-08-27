@@ -106,7 +106,8 @@ mixi2のログイン保持と投稿画面を、投稿せずに確認する:
 
     ruby bin/mixi2_smoke
 
-`mixi2 smoke test: ok` と表示されれば、タスク実行用ブラウザから投稿画面まで到達できる。
+`mixi2 smoke test: ok` とログイン中の `@アカウント` が表示されれば、タスク実行用ブラウザから
+本人アカウントを識別し、投稿画面まで到達できる。
 `targets.watch` または `targets.post` に `mixi2` を追加すると、`bin/run_queue` が
 専用Chromeを使って投稿する。専用Chromeを手動で開いたまま実行しないこと。
 
