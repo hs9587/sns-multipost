@@ -2,6 +2,8 @@ require_relative "test_helper"
 require "task_status"
 
 class TaskStatusTest < Minitest::Test
+  FakeStatus = Struct.new(:success?, :exitstatus)
+
   def test_formats_disabled_task_without_next_run
     status = {
       "TaskName" => "sns-multipost",
@@ -40,5 +42,33 @@ class TaskStatusTest < Minitest::Test
   def test_formats_other_result_as_decimal_and_hex
     assert_equal "267009 (0x00041301)",
                  SnsMultipost::TaskStatus.format_result(267_009)
+  end
+
+  def test_set_enabled_uses_windows_task_commands
+    scripts = []
+    capture3 = lambda do |*_args|
+      scripts << _args.last
+      ["", "", FakeStatus.new(true, 0)]
+    end
+
+    assert SnsMultipost::TaskStatus.set_enabled(
+      "sns-multipost", enabled: true, capture3: capture3)
+    assert SnsMultipost::TaskStatus.set_enabled(
+      "sns-multipost", enabled: false, capture3: capture3)
+    assert_includes scripts[0], "Enable-ScheduledTask -TaskName 'sns-multipost'"
+    assert_includes scripts[1], "Disable-ScheduledTask -TaskName 'sns-multipost'"
+  end
+
+  def test_set_enabled_escapes_single_quote_in_task_name
+    script = nil
+    capture3 = lambda do |*args|
+      script = args.last
+      ["", "", FakeStatus.new(true, 0)]
+    end
+
+    SnsMultipost::TaskStatus.set_enabled(
+      "task'name", enabled: false, capture3: capture3)
+
+    assert_includes script, "-TaskName 'task''name'"
   end
 end

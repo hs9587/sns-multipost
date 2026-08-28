@@ -43,6 +43,24 @@ module SnsMultipost
       raise "Windowsタスク「#{task_name}」の結果を解析できません: #{e.message}"
     end
 
+    def set_enabled(task_name, enabled:, capture3: Open3.method(:capture3))
+      escaped_name = task_name.gsub("'", "''")
+      command = enabled ? "Enable-ScheduledTask" : "Disable-ScheduledTask"
+      script = <<~POWERSHELL
+        $ErrorActionPreference = 'Stop'
+        [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+        #{command} -TaskName '#{escaped_name}' | Out-Null
+      POWERSHELL
+      _stdout, stderr, status = capture3.call(
+        "powershell.exe", "-NoProfile", "-NonInteractive",
+        "-ExecutionPolicy", "Bypass", "-Command", script)
+      return true if status.success?
+
+      message = utf8(stderr).strip
+      message = "終了コード#{status.exitstatus}" if message.empty?
+      raise "Windowsタスク「#{task_name}」を変更できません: #{message}"
+    end
+
     def format(status, now: Time.now)
       state = status.fetch("State").to_s
       next_run = status["NextRunTime"]

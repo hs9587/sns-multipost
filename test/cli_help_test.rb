@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task_status threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task_status task_switch threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -64,6 +64,24 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "--task NAME"
     assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
     assert_includes stdout, "読み取るだけ"
+  end
+
+  def test_task_switch_help_explains_cross_shell_enable_and_disable
+    stdout, _stderr, status = run_cli("task_switch", "--help")
+    assert status.success?
+    assert_includes stdout, "enable"
+    assert_includes stdout, "disable"
+    assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
+    assert_includes stdout, "実行中の処理は強制終了しません"
+  end
+
+  def test_task_switch_requires_valid_action_before_changing_task
+    [[], ["start"], ["enable", "extra"]].each do |arguments|
+      _stdout, stderr, status = run_cli("task_switch", *arguments)
+      assert_equal 2, status.exitstatus
+      assert_includes stderr, "enable または disable"
+      assert_includes stderr, "Usage: ruby bin/task_switch"
+    end
   end
 
   def test_dryrun_titles_help_explains_dictionary_check_without_posting

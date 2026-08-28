@@ -57,6 +57,7 @@
     ruby bin/post --help
     ruby bin/run_queue --help
     ruby bin/task_status --help
+    ruby bin/task_switch --help
 
 典型的な使い方は次の3通り。
 
