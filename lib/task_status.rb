@@ -61,6 +61,51 @@ module SnsMultipost
       raise "Windowsタスク「#{task_name}」を変更できません: #{message}"
     end
 
+    def register(task_name, runner_path:, minutes:, capture3: Open3.method(:capture3))
+      runner = File.expand_path(runner_path)
+      raise "タスク用バッチが見つかりません: #{runner}" unless File.file?(runner)
+
+      interval = Integer(minutes)
+      raise "実行間隔は1～1440分で指定してください" unless interval.between?(1, 1440)
+
+      _stdout, stderr, status = capture3.call(
+        "schtasks.exe", "/Create", "/TN", task_name,
+        "/TR", %Q{"#{runner}"}, "/SC", "MINUTE", "/MO", interval.to_s, "/F")
+      unless status.success?
+        message = utf8(stderr).strip
+        message = "終了コード#{status.exitstatus}" if message.empty?
+        raise "Windowsタスク「#{task_name}」を登録できません: #{message}"
+      end
+
+      escaped_name = task_name.gsub("'", "''")
+      script = <<~POWERSHELL
+        $ErrorActionPreference = 'Stop'
+        [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
+        Set-ScheduledTask -TaskName '#{escaped_name}' -Settings $settings | Out-Null
+      POWERSHELL
+      _stdout, stderr, status = capture3.call(
+        "powershell.exe", "-NoProfile", "-NonInteractive",
+        "-ExecutionPolicy", "Bypass", "-Command", script)
+      return true if status.success?
+
+      message = utf8(stderr).strip
+      message = "終了コード#{status.exitstatus}" if message.empty?
+      raise "Windowsタスク「#{task_name}」は登録されましたが、運用設定を変更できません: #{message}"
+    rescue ArgumentError, TypeError
+      raise "実行間隔は1～1440分で指定してください"
+    end
+
+    def unregister(task_name, capture3: Open3.method(:capture3))
+      _stdout, stderr, status = capture3.call(
+        "schtasks.exe", "/Delete", "/TN", task_name, "/F")
+      return true if status.success?
+
+      message = utf8(stderr).strip
+      message = "終了コード#{status.exitstatus}" if message.empty?
+      raise "Windowsタスク「#{task_name}」を解除できません: #{message}"
+    end
+
     def format(status, now: Time.now)
       state = status.fetch("State").to_s
       next_run = status["NextRunTime"]

@@ -4,32 +4,55 @@ require "cli"
 require "task_status"
 
 task_name = "sns-multipost"
+runner_path = File.expand_path("~/Documents/sns-multipost-cron.bat")
+minutes = 10
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/task [options] [ACTION]",
-  description: "sns-multipost用Windowsタスクスケジューラの状態確認、有効化、一時停止を行います。\nPowerShell、コマンドプロンプト、Git Bashから同じように実行できます。",
+  description: "sns-multipost用Windowsタスクスケジューラの状態確認、登録、解除、有効化、一時停止を行います。\nPowerShell、コマンドプロンプト、Git Bashから同じように実行できます。",
   examples: ["ruby bin/task", "ruby bin/task disable", "ruby bin/task enable",
-             "ruby bin/task --task sns-multipost"],
+             "ruby bin/task register", "ruby bin/task unregister",
+             "ruby bin/task register --minutes 10 --runner C:\\path\\sns-multipost-cron.bat"],
   notes: ["ACTIONを省略すると状態を読み取るだけです。",
-          "ACTIONは enable または disable です。",
+          "ACTIONは register、unregister、enable、disable のいずれかです。",
+          "registerの既定は ~/Documents/sns-multipost-cron.bat を10分間隔で実行します。",
+          "registerは同名タスクを上書きして有効化し、バッテリ動作と多重起動防止を設定します。",
+          "unregisterはタスク登録だけを解除し、バッチ、ログ、ジョブは削除しません。",
           "切替後も現在の状態、次回・前回実行時刻、前回結果を表示します。",
           "disableは今後の起動を止めますが、すでに実行中の処理は強制終了しません。"]
 ) do |opts|
   opts.on("--task NAME", "確認または変更するWindowsタスク名") do |value|
     task_name = value
   end
+  opts.on("--runner PATH", "registerで実行するバッチファイル") do |value|
+    runner_path = value
+  end
+  opts.on("--minutes N", Integer, "registerの実行間隔（1～1440分）") do |value|
+    minutes = value
+  end
 end
 SnsMultipost::Cli.parse!(parser)
 if task_name.to_s.strip.empty?
   SnsMultipost::Cli.usage_error(parser, "タスク名を指定してください")
 end
-unless ARGV.length <= 1 && (ARGV.empty? || %w[enable disable].include?(ARGV.first))
+actions = %w[register unregister enable disable]
+unless ARGV.length <= 1 && (ARGV.empty? || actions.include?(ARGV.first))
   SnsMultipost::Cli.usage_error(
-    parser, "ACTIONを省略するか、enable または disable を指定してください")
+    parser, "ACTIONを省略するか、register、unregister、enable、disable のいずれかを指定してください")
 end
 
 action = ARGV.first
 begin
-  if action
+  case action
+  when "register"
+    SnsMultipost::TaskStatus.register(
+      task_name, runner_path: runner_path, minutes: minutes)
+    puts "登録: #{task_name}（#{minutes}分間隔、#{File.expand_path(runner_path)}）"
+  when "unregister"
+    SnsMultipost::TaskStatus.unregister(task_name)
+    puts "解除: #{task_name}"
+    puts "バッチ、ログ、queue、failed、doneは削除していません。"
+    exit 0
+  when "enable", "disable"
     SnsMultipost::TaskStatus.set_enabled(task_name, enabled: action == "enable")
     puts "変更: #{action == 'enable' ? '有効化' : '一時停止'}"
   end

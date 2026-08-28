@@ -155,17 +155,16 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 2. `config.yml` の `dry_run` を `false` にする（本番スイッチ）
 3. `targets.watch` と `targets.post` から、投稿クレジット等の都合で使わない SNS があれば外しておく
 
-### 3. タスク登録（5分おきの例）
+### 3. タスク登録（既定10分おき）
 
-    schtasks /Create /TN "sns-multipost" /TR "<.batの絶対パス>" /SC MINUTE /MO 5 /F
+    ruby bin\task register
+
+既定では `~/Documents/sns-multipost-cron.bat` を10分おきに実行する。同名タスクがあれば
+上書きして有効化し、バッテリ動作を許可、多重起動は抑止する。場所や間隔を変える場合:
+
+    ruby bin\task register --runner C:\path\sns-multipost-cron.bat --minutes 5
 
 ログオン中に動く。PC がスリープ中は動かないので常時起動の機で運用する。
-
-`schtasks /Create` の既定は **バッテリ運用中は起動抑止**（ノートPCだと電源を抜くと止まる）。
-常時動かすなら登録後に外す（PowerShell、トリガ/プリンシパルは維持される）:
-
-    $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
-    Set-ScheduledTask -TaskName "sns-multipost" -Settings $s
 
 登録直後は `schtasks /Run /TN "sns-multipost"` で1回手動起動し、`logs\cron.log` の先頭に
 `start cwd=<REPO>` が出ること（cwd がリポジトリに入っていること）を確認しておくとよい。
@@ -178,6 +177,7 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 - 動作ログ: `type logs\cron.log`（末尾に `ok=... failed=...`）
 - 状態確認: `ruby bin\task`（PowerShell、コマンドプロンプト、Git Bash共通。次回・前回実行と結果を文字化けせず表示）
 - 一時停止 / 再開: `ruby bin\task disable` / `ruby bin\task enable`（3シェル共通。切替後の状態も表示）
+- 登録 / 解除: `ruby bin\task register` / `ruby bin\task unregister`（解除してもバッチ、ログ、ジョブは削除しない）
 - このタスクの確認: `schtasks /Query /TN "sns-multipost" /V /FO LIST`
 - 全タスク一覧: `schtasks /Query`（数が多いので `schtasks /Query | findstr sns-multipost` で絞れる）
 - 一時停止 / 再開（スケジュール自体のオンオフ）: `schtasks /Change /TN "sns-multipost" /DISABLE`（再開は /ENABLE）

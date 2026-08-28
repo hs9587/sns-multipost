@@ -1,5 +1,6 @@
 require_relative "test_helper"
 require "task_status"
+require "fileutils"
 
 class TaskStatusTest < Minitest::Test
   FakeStatus = Struct.new(:success?, :exitstatus)
@@ -70,5 +71,57 @@ class TaskStatusTest < Minitest::Test
       "task'name", enabled: false, capture3: capture3)
 
     assert_includes script, "-TaskName 'task''name'"
+  end
+
+  def test_register_creates_repeating_task_and_sets_operational_settings
+    Dir.mktmpdir do |dir|
+      runner = File.join(dir, "cron wrapper.bat")
+      FileUtils.touch(runner)
+      calls = []
+      capture3 = lambda do |*args|
+        calls << args
+        ["", "", FakeStatus.new(true, 0)]
+      end
+
+      assert SnsMultipost::TaskStatus.register(
+        "sns-multipost", runner_path: runner, minutes: 10, capture3: capture3)
+      assert_equal [
+        "schtasks.exe", "/Create", "/TN", "sns-multipost", "/TR", %Q{"#{runner}"},
+        "/SC", "MINUTE", "/MO", "10", "/F"
+      ], calls[0]
+      assert_includes calls[1].last, "AllowStartIfOnBatteries"
+      assert_includes calls[1].last, "DontStopIfGoingOnBatteries"
+      assert_includes calls[1].last, "MultipleInstances IgnoreNew"
+    end
+  end
+
+  def test_register_rejects_missing_runner_and_invalid_interval
+    error = assert_raises(RuntimeError) do
+      SnsMultipost::TaskStatus.register(
+        "sns-multipost", runner_path: "missing.bat", minutes: 10)
+    end
+    assert_match(/バッチが見つかりません/, error.message)
+
+    Dir.mktmpdir do |dir|
+      runner = File.join(dir, "cron.bat")
+      FileUtils.touch(runner)
+      error = assert_raises(RuntimeError) do
+        SnsMultipost::TaskStatus.register(
+          "sns-multipost", runner_path: runner, minutes: 0)
+      end
+      assert_match(/1～1440分/, error.message)
+    end
+  end
+
+  def test_unregister_deletes_only_named_task_registration
+    call = nil
+    capture3 = lambda do |*args|
+      call = args
+      ["", "", FakeStatus.new(true, 0)]
+    end
+
+    assert SnsMultipost::TaskStatus.unregister(
+      "sns-multipost", capture3: capture3)
+    assert_equal ["schtasks.exe", "/Delete", "/TN", "sns-multipost", "/F"], call
   end
 end
