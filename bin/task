@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "task_status"
+
+task_name = "sns-multipost"
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/task [options] [ACTION]",
+  description: "sns-multipost用Windowsタスクスケジューラの状態確認、有効化、一時停止を行います。\nPowerShell、コマンドプロンプト、Git Bashから同じように実行できます。",
+  examples: ["ruby bin/task", "ruby bin/task disable", "ruby bin/task enable",
+             "ruby bin/task --task sns-multipost"],
+  notes: ["ACTIONを省略すると状態を読み取るだけです。",
+          "ACTIONは enable または disable です。",
+          "切替後も現在の状態、次回・前回実行時刻、前回結果を表示します。",
+          "disableは今後の起動を止めますが、すでに実行中の処理は強制終了しません。"]
+) do |opts|
+  opts.on("--task NAME", "確認または変更するWindowsタスク名") do |value|
+    task_name = value
+  end
+end
+SnsMultipost::Cli.parse!(parser)
+if task_name.to_s.strip.empty?
+  SnsMultipost::Cli.usage_error(parser, "タスク名を指定してください")
+end
+unless ARGV.length <= 1 && (ARGV.empty? || %w[enable disable].include?(ARGV.first))
+  SnsMultipost::Cli.usage_error(
+    parser, "ACTIONを省略するか、enable または disable を指定してください")
+end
+
+action = ARGV.first
+begin
+  if action
+    SnsMultipost::TaskStatus.set_enabled(task_name, enabled: action == "enable")
+    puts "変更: #{action == 'enable' ? '有効化' : '一時停止'}"
+  end
+  puts SnsMultipost::TaskStatus.format(SnsMultipost::TaskStatus.query(task_name))
+rescue StandardError => e
+  warn e.message
+  exit 1
+end

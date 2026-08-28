@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task_status task_switch threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -58,29 +58,23 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
   end
 
-  def test_task_status_help_explains_cross_shell_read_only_check
-    stdout, _stderr, status = run_cli("task_status", "--help")
+  def test_task_help_explains_cross_shell_status_and_switches
+    stdout, _stderr, status = run_cli("task", "--help")
     assert status.success?
     assert_includes stdout, "--task NAME"
     assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
-    assert_includes stdout, "読み取るだけ"
-  end
-
-  def test_task_switch_help_explains_cross_shell_enable_and_disable
-    stdout, _stderr, status = run_cli("task_switch", "--help")
-    assert status.success?
     assert_includes stdout, "enable"
     assert_includes stdout, "disable"
-    assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
+    assert_includes stdout, "省略すると状態を読み取るだけ"
     assert_includes stdout, "実行中の処理は強制終了しません"
   end
 
-  def test_task_switch_requires_valid_action_before_changing_task
-    [[], ["start"], ["enable", "extra"]].each do |arguments|
-      _stdout, stderr, status = run_cli("task_switch", *arguments)
+  def test_task_rejects_invalid_action_before_changing_task
+    [["start"], ["enable", "extra"]].each do |arguments|
+      _stdout, stderr, status = run_cli("task", *arguments)
       assert_equal 2, status.exitstatus
-      assert_includes stderr, "enable または disable"
-      assert_includes stderr, "Usage: ruby bin/task_switch"
+      assert_includes stderr, "ACTIONを省略するか、enable または disable"
+      assert_includes stderr, "Usage: ruby bin/task"
     end
   end
 

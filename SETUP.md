@@ -176,8 +176,8 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 `Set-ScheduledTask`（PowerShell）と `schtasks` は同じタスクを触るので混在しても問題ない。
 
 - 動作ログ: `type logs\cron.log`（末尾に `ok=... failed=...`）
-- 状態確認: `ruby bin\task_status`（PowerShell、コマンドプロンプト、Git Bash共通。次回・前回実行と結果を文字化けせず表示）
-- 一時停止 / 再開: `ruby bin\task_switch disable` / `ruby bin\task_switch enable`（3シェル共通。切替後の状態も表示）
+- 状態確認: `ruby bin\task`（PowerShell、コマンドプロンプト、Git Bash共通。次回・前回実行と結果を文字化けせず表示）
+- 一時停止 / 再開: `ruby bin\task disable` / `ruby bin\task enable`（3シェル共通。切替後の状態も表示）
 - このタスクの確認: `schtasks /Query /TN "sns-multipost" /V /FO LIST`
 - 全タスク一覧: `schtasks /Query`（数が多いので `schtasks /Query | findstr sns-multipost` で絞れる）
 - 一時停止 / 再開（スケジュール自体のオンオフ）: `schtasks /Change /TN "sns-multipost" /DISABLE`（再開は /ENABLE）
