@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task_status threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -56,6 +56,14 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "先に ruby bin/watch"
     assert_includes stdout, "Bloggerは本文をAPI投稿"
     assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
+  end
+
+  def test_task_status_help_explains_cross_shell_read_only_check
+    stdout, _stderr, status = run_cli("task_status", "--help")
+    assert status.success?
+    assert_includes stdout, "--task NAME"
+    assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
+    assert_includes stdout, "読み取るだけ"
   end
 
   def test_dryrun_titles_help_explains_dictionary_check_without_posting
