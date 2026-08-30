@@ -57,6 +57,7 @@
     ruby bin/post --help
     ruby bin/run_queue --help
     ruby bin/task --help
+    ruby bin/failed_jobs --help
 
 典型的な使い方は次の3通り。
 
@@ -83,6 +84,7 @@
     ruby bin/watch --sync-only
     ruby bin/watch --rewind 1
     ruby bin/retry failed/x.json
+    ruby bin/failed_jobs --all --offset 3 --limit 3
     ruby bin/dryrun_titles 200
     ruby bin/threads_auth --help
     ruby bin/browser_login blogger

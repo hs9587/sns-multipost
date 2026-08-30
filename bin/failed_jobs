@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "job_history"
+
+limit = 3
+offset = 0
+include_all = false
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/failed_jobs [options]",
+  description: "sns-multipostのfailedジョブを、doneの最新時刻と比較して一覧表示します。\n投稿やファイル移動は行わない読み取り専用コマンドです。",
+  examples: ["ruby bin/failed_jobs", "ruby bin/failed_jobs --limit 10",
+             "ruby bin/failed_jobs --all", "ruby bin/failed_jobs --all --offset 3 --limit 3"],
+  notes: ["既定ではdone最新と同時刻以降のfailedを新しい順に3件表示します。",
+          "--allはdone最新より古い保留分も含めます。",
+          "--offsetは新しい方から指定件数を飛ばし、さらに過去を表示します。",
+          "JSONだけを数え、診断画像PNGは数えません。自動retryは行いません。"]
+) do |opts|
+  opts.on("--limit N", Integer, "表示件数（1～100、既定3件）") { |value| limit = value }
+  opts.on("--offset N", Integer, "新しい方から読み飛ばす件数（0以上）") { |value| offset = value }
+  opts.on("--all", "done最新より古いfailedも含める") { include_all = true }
+end
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+unless limit.between?(1, 100)
+  SnsMultipost::Cli.usage_error(parser, "--limitは1以上100以下で指定してください")
+end
+if offset.negative?
+  SnsMultipost::Cli.usage_error(parser, "--offsetは0以上で指定してください")
+end
+
+root = File.expand_path("..", __dir__)
+history = SnsMultipost::JobHistory.snapshot(
+  done_directory: File.join(root, "done"),
+  failed_directory: File.join(root, "failed"),
+  include_all: include_all)
+puts SnsMultipost::JobHistory.format_list(history, offset: offset, limit: limit)

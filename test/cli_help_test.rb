@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login dryrun_titles failed_jobs jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -80,6 +80,24 @@ class CliHelpTest < Minitest::Test
       assert_equal 2, status.exitstatus
       assert_includes stderr, "ACTIONを省略するか、register、unregister、enable、disable"
       assert_includes stderr, "Usage: ruby bin/task"
+    end
+  end
+
+  def test_failed_jobs_help_explains_history_options
+    stdout, _stderr, status = run_cli("failed_jobs", "--help")
+    assert status.success?
+    assert_includes stdout, "--limit N"
+    assert_includes stdout, "--offset N"
+    assert_includes stdout, "--all"
+    assert_includes stdout, "done最新と同時刻以降"
+    assert_includes stdout, "自動retryは行いません"
+  end
+
+  def test_failed_jobs_rejects_invalid_paging_options
+    [["--limit", "0"], ["--limit", "101"], ["--offset", "-1"]].each do |arguments|
+      _stdout, stderr, status = run_cli("failed_jobs", *arguments)
+      assert_equal 2, status.exitstatus
+      assert_includes stderr, "Usage: ruby bin/failed_jobs"
     end
   end
 

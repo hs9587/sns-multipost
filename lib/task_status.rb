@@ -133,20 +133,6 @@ module SnsMultipost
       Kernel.format("%d (0x%08X)", result, result & 0xffffffff)
     end
 
-    def format_failed_jobs(directory, limit: 3)
-      jobs = Dir.children(directory)
-                .select { |name| name.end_with?(".json") && File.file?(File.join(directory, name)) }
-                .sort
-                .reverse
-      lines = ["failed内のジョブ: #{jobs.length}件（保留分を含む・自動判定ではありません）"]
-      jobs.first(limit).each do |name|
-        lines << "  #{name}"
-      end
-      remaining = jobs.length - limit
-      lines << "  ほか#{remaining}件" if remaining.positive?
-      lines.join("\n")
-    end
-
     def utf8(string)
       string.to_s.dup.force_encoding(Encoding::UTF_8).scrub
     end
