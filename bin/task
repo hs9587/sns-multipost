@@ -18,6 +18,7 @@ parser = SnsMultipost::Cli.parser(
           "registerは同名タスクを上書きして有効化し、バッテリ動作と多重起動防止を設定します。",
           "unregisterはタスク登録だけを解除し、バッチ、ログ、ジョブは削除しません。",
           "切替後も現在の状態、次回・前回実行時刻、前回結果を表示します。",
+          "状態表示ではfailed内のジョブ数と最新3件も示します。保留分を含むため自動判定や再投稿はしません。",
           "disableは今後の起動を止めますが、すでに実行中の処理は強制終了しません。"]
 ) do |opts|
   opts.on("--task NAME", "確認または変更するWindowsタスク名") do |value|
@@ -57,6 +58,7 @@ begin
     puts "変更: #{action == 'enable' ? '有効化' : '一時停止'}"
   end
   puts SnsMultipost::TaskStatus.format(SnsMultipost::TaskStatus.query(task_name))
+  puts SnsMultipost::TaskStatus.format_failed_jobs(File.expand_path("../failed", __dir__))
 rescue StandardError => e
   warn e.message
   exit 1

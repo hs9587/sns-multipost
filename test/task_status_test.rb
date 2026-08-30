@@ -45,6 +45,33 @@ class TaskStatusTest < Minitest::Test
                  SnsMultipost::TaskStatus.format_result(267_009)
   end
 
+  def test_formats_failed_job_count_and_latest_json_files
+    Dir.mktmpdir do |dir|
+      %w[
+        20260828-143701_jotter_9fd2.json
+        20260828-154701_jotter_77ab.json
+        20260830-115702_jotter_e05d.json
+        20260830-115702_jotter_e05d.png
+        note.txt
+      ].each { |name| FileUtils.touch(File.join(dir, name)) }
+
+      output = SnsMultipost::TaskStatus.format_failed_jobs(dir, limit: 2)
+
+      assert_includes output, "failed内のジョブ: 3件（保留分を含む・自動判定ではありません）"
+      assert_includes output, "20260830-115702_jotter_e05d.json"
+      assert_includes output, "20260828-154701_jotter_77ab.json"
+      refute_includes output, "20260830-115702_jotter_e05d.png"
+      assert_includes output, "ほか1件"
+    end
+  end
+
+  def test_formats_empty_failed_directory
+    Dir.mktmpdir do |dir|
+      assert_equal "failed内のジョブ: 0件（保留分を含む・自動判定ではありません）",
+                   SnsMultipost::TaskStatus.format_failed_jobs(dir)
+    end
+  end
+
   def test_set_enabled_uses_windows_task_commands
     scripts = []
     capture3 = lambda do |*_args|
