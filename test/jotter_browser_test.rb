@@ -36,7 +36,7 @@ class JotterBrowserTest < Minitest::Test
 
     def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false,
                    home_requires_reset: false, confirmation_steps: 1, post_detail: true,
-                   stale_actions: [])
+                   stale_actions: [], savepoint_account_panel: false)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
@@ -44,6 +44,7 @@ class JotterBrowserTest < Minitest::Test
       @confirmation_steps = confirmation_steps
       @post_detail = post_detail
       @stale_actions = stale_actions.dup
+      @savepoint_account_panel = savepoint_account_panel
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -66,11 +67,16 @@ class JotterBrowserTest < Minitest::Test
       when SnsMultipost::JotterBrowser::HOME_RESET_JS
         @home_reset = true
       when SnsMultipost::JotterBrowser::SAVEPOINT_READY_JS
-        { "ready" => true }
+        if @savepoint_account_panel
+          { "ready" => false, "sessionReady" => true, "hasWallet" => true,
+            "hasUserFace" => false }
+        else
+          { "ready" => true, "sessionReady" => true }
+        end
       when SnsMultipost::JotterBrowser::OPEN_ACCOUNT_JS
         @account_open = true
       when SnsMultipost::JotterBrowser::ACCOUNT_NAME_JS
-        return nil unless @account_open
+        return nil unless @account_open || @savepoint_account_panel
         if @wrong_account_once && @goto_count < 2
           "temporary"
         else
@@ -207,6 +213,28 @@ class JotterBrowserTest < Minitest::Test
 
     assert_equal true, result["hasEditor"]
     assert_equal true, result["hasSubmit"]
+  end
+
+  def test_smoke_recovers_when_savepoint_opens_authenticated_account_panel
+    browser = FakeBrowser.new(savepoint_account_panel: true)
+    messages = []
+    jotter = SnsMultipost::JotterBrowser.new(
+      savepoint_url: "https://secret.example/savepoint",
+      account_name: "hs9587",
+      browser: browser,
+      timeout: 0,
+      auth_timeout: 0,
+      confirmation_timeout: 0,
+      wallet_browser_id_timeout: 0,
+      savepoint_settle_seconds: 0,
+      sleeper: ->(_seconds) {},
+      logger: ->(message) { messages << message })
+
+    result = jotter.smoke
+
+    assert_equal true, result["hasEditor"]
+    assert_includes messages, "Jotter: ログイン済みの別画面を確認（ホーム復帰を試行）"
+    assert_includes messages, "Jotter: 期待するアカウント表示名と一致"
   end
 
   def test_post_enters_text_selects_public_and_confirms_url

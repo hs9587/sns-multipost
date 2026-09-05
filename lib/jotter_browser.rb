@@ -43,6 +43,7 @@ module SnsMultipost
         const hasUserFace = !!document.querySelector('input[type="image"].user-face');
         return {
           ready: !welcome && hasWallet && hasUserFace,
+          sessionReady: !welcome && hasWallet,
           welcome: welcome,
           hashPresent: hashPresent,
           hasWallet: hasWallet,
@@ -584,7 +585,7 @@ module SnsMultipost
         last_state = nil
         ready = wait_for(timeout: @auth_timeout) do
           last_state = safe_evaluate(SAVEPOINT_READY_JS)
-          last_state && last_state["ready"]
+          last_state && (last_state["ready"] || last_state["sessionReady"])
         end
         unless ready
           status("Jotter: 復元完了後のホーム画面を確認できません")
@@ -599,7 +600,11 @@ module SnsMultipost
           end
           next
         end
-        status("Jotter: 復元完了後のホーム画面を確認")
+        if last_state["ready"]
+          status("Jotter: 復元完了後のホーム画面を確認")
+        else
+          status("Jotter: ログイン済みの別画面を確認（ホーム復帰を試行）")
+        end
         @sleeper.call(1)
         next unless correct_account?
 
@@ -616,12 +621,15 @@ module SnsMultipost
 
     def correct_account?
       return true if @account_name.empty?
-      unless safe_evaluate(OPEN_ACCOUNT_JS)
-        status("Jotter: アカウント設定を開けません")
-        return false
-      end
 
-      name = wait_for(timeout: @auth_timeout) { safe_evaluate(ACCOUNT_NAME_JS) }
+      name = safe_evaluate(ACCOUNT_NAME_JS)
+      unless name
+        unless safe_evaluate(OPEN_ACCOUNT_JS)
+          status("Jotter: アカウント設定を開けません")
+          return false
+        end
+        name = wait_for(timeout: @auth_timeout) { safe_evaluate(ACCOUNT_NAME_JS) }
+      end
       unless name
         status("Jotter: アカウント表示名を確認できません")
         return false
