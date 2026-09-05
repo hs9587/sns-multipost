@@ -24,7 +24,8 @@
 - mixi2ポスト、mixiつぶやき、Jotter.me公開テキスト／単画像投稿は専用Chromeによる実投稿を確認済み
 - Jotter.meは専用Browser IDの継続、DEN残高読取り、手動振替の画面保持、未検証DENの検証要求を確認済み
 - Jotter.meの画像ジョブを `targets.watch` から作成して公開確認済み。新規投稿の別ブラウザへの反映は遅れる場合がある
-- Threadsはテキストと単画像を実投稿確認済み。複数画像を1件にまとめる投稿は実装・自動テスト済みだが、実投稿は未確認
+- Threadsはテキストと単画像をAPIで実投稿確認済み。複数画像を1件にまとめる投稿は実装・自動テスト済みだが、実投稿は未確認
+- 現在のThreads実運用は、画像付き投稿をInstagramから、テキストだけの投稿をFacebookから波及させる。Threads API投稿は波及停止時の予備・明示的なテスト経路として維持する
 - Tumblrの短命トークンとローテーション型refresh tokenは自動更新・永続化済み
 - Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり。`bin/task` で状態確認、登録・解除、有効化・一時停止ができる
 - `bin/task` はdone最新時刻以降のfailedを表示し、`bin/failed_jobs` では古い保留分を含む履歴をページ指定して確認できる
@@ -41,7 +42,7 @@
 | Fedibird | 稼働 | API。きっかけ投稿兼用。手動投入時は投稿先にもなる |
 | Bluesky | 稼働 | AT Protocol。画像対応 |
 | Tumblr | 稼働 | OAuth2 API。トークン自動更新、画像対応 |
-| Threads | 稼働・画像運用は再検討 | 公式API。テキストと単画像は実投稿確認済み。複数画像投稿は自動テスト済み |
+| Threads | 実装済み・予備経路 | 公式API。通常運用は画像付きをInstagram、テキストだけをFacebookから波及。APIはテキストと単画像を実投稿確認済み、複数画像は自動テスト済み |
 | Blogger | 稼働 | 混合方式。本文はGoogle OAuth2 API、画像だけ専用ChromeでBlogger内部ストアへ保存 |
 | mixi | 稼働 | 専用Chrome。つぶやき、本文150文字・画像1枚 |
 | mixi2 | 稼働 | 専用Chrome。本文150文字・画像4枚。投稿確認はログイン中の本人プロフィールに限定 |
@@ -122,8 +123,9 @@ Fedibird投稿後に `--from-fedibird-latest` でThreadsジョブを追加する
 ジョブを作らない。Bloggerを明示的に選んだ場合はFedibird画像を一度ローカルへ取得し、専用Chromeで
 `blogger.googleusercontent.com` へ保存してから本文へ埋め込む。
 Threadsは投稿時にMetaが公開URLから画像を取得する。2026-08-11にこの経路でThreadsと
-Bloggerの単画像投稿を実地確認した。Instagramからの本来の
-波及方法を決めた後に、Threads画像の実運用経路は再検討する。
+Bloggerの単画像投稿を実地確認した。通常運用では、Threadsの画像付き投稿はInstagramから、
+テキストだけの投稿はFacebookから波及させる。このAPI経路は波及が使えない場合の予備、および
+明示的なテスト用として維持する。複数画像カルーセルは実サービス上での確認待ち。
 
 Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択後に画面が示す必要DENを読み、
 利用可能DENが足りる場合だけ投稿する。利用可能分が時間経過で未検証へ戻ることがあるため、
@@ -136,12 +138,12 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 ## ロードマップ
 
 1. ページング、HTTPタイムアウト、監視・キュー書込み側への排他制御拡張、古いジョブ・画像の清掃など、安全性と安定性を高める
-2. Threads画像の実運用経路と、複数画像投稿の実地確認を再検討する
+2. Threadsの複数画像カルーセルを実地確認し、APIを予備経路として維持する
 3. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
 
 従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
 されなかった。このため、現在はBlogger API投稿の前に専用Chromeで内部画像ストアへ保存する。
-Instagram連携とThreads画像の実運用経路は今後再検討する。
+Threadsの通常運用は、画像付き投稿をInstagram、テキストだけの投稿をFacebookから波及させる。
 
 Blogger編集画面の「パソコンからアップロード」を自動操作する小規模実証では、ローカルPNGを
 `blogger.googleusercontent.com` へ保存し、Chromeを閉じた後も下書きで表示できた。

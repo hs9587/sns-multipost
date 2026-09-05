@@ -28,6 +28,7 @@ parser = SnsMultipost::Cli.parser(
           "--imageは複数指定できます。Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2、Jotterのジョブだけを作ります。",
           "Jotterは先頭画像1枚だけを使い、専用Browser IDと利用可能DENを投稿前に確認します。",
           "--from-fedibird-latestは最新Fedibird投稿の本文と画像URLをThreads、Bloggerへ渡します。",
+          "Threadsは通常運用では画像付きをInstagram、テキストだけをFacebookから波及させ、API投稿は明示的な--targetによる予備・テスト経路として使います。",
           "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
           "Blogger画像を初めて使う前に ruby bin/browser_login blogger で専用Chromeへログインしてください。",
           "画像は絶対パスに直してキューへ保存するため、run_queue完了まで移動・削除しないでください。"]

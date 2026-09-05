@@ -2,7 +2,7 @@
 
 - 日付: 2026-08-06
 - 状態: テキストは実投稿確認完了（2026-08-08）。単画像も実投稿確認完了、カルーセルは自動テスト完了（2026-08-11）
-- 対象入口: テキストの `targets.post` と、実地確認用の `--from-fedibird-latest`
+- 対象入口: 予備・テスト経路として明示する `--target threads` と、実地確認用の `--from-fedibird-latest`
 
 ## 方針
 
@@ -19,6 +19,16 @@ Threads はブラウザ操作ではなく、Meta公式 Threads API を使う。
 自分の最新Fedibird投稿から本文と静止画像URLを取得し、ThreadsとBloggerのジョブだけを作る。
 この操作は `watch`、`since_id`、自己投稿除外状態を変更しない。対象投稿URLと画像枚数を表示し、
 画像がない場合はジョブを作成しない。
+
+## 運用上の位置づけ
+
+現在の実運用では、Threadsの画像付き投稿はInstagramから、テキストだけの投稿はFacebookから
+波及させる。このため、`targets.watch` と `targets.post` へThreadsを常設せず、sns-multipostの
+Threads APIは波及機能が停止・不調になった場合の予備経路、および実地テスト用として維持する。
+APIを使うときは `--target threads` を明示する。
+
+複数画像の実地確認には、Fedibirdへ静止画像2枚を含む投稿を行い、それが最新投稿の間に
+`bin/post --target threads --from-fedibird-latest` を実行する。この操作は監視基準を変更しない。
 
 認証スコープは `threads_basic,threads_content_publish`。`bin/threads_auth` が
 認可URL生成、認可コード交換、短期トークンから長期トークンへの交換を行い、
@@ -46,9 +56,9 @@ APIが投稿IDを返すことと、Threads上に投稿が公開されたこと�
 ThreadsとBloggerへ `bin/post --from-fedibird-latest` → `bin/run_queue` で投稿した。両方の公開表示を
 確認し、テスト投稿は確認後に削除した。実際の投稿IDや認証情報は保存しない。
 
-単画像の技術確認は完了したが、実運用ではInstagramからThreadsへの波及を想定している。
-Blogger内部画像ストアへのアップロードは通常投稿へ接続済みで、統合後の実投稿確認待ち。
-その確認とInstagram連携を決めた段階で、API画像投稿を実運用に使うかを再検討する。
+通常運用は、画像付きをInstagram、テキストだけをFacebookからThreadsへ波及させる。
+API投稿は予備・テスト経路として維持する。単画像の技術確認は完了しており、残るThreads固有の
+実地確認は複数画像カルーセルである。
 
 公式資料:
 

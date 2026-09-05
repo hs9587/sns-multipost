@@ -197,6 +197,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "--from-fedibird-latest"
     assert_includes stdout, "Fedibird、Bluesky、Tumblr、Blogger、mixi、mixi2"
     assert_includes stdout, "Threads、Blogger"
+    assert_includes stdout, "API投稿は明示的な--targetによる予備・テスト経路"
     assert_includes stdout, "Bloggerは本文をAPI投稿"
     assert_includes stdout, "ruby bin/browser_login blogger"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"

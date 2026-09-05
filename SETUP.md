@@ -76,11 +76,21 @@ Threads は公式 Threads API と OAuth2 を使う。投稿権限は `threads_ba
 
        ruby bin/threads_auth --callback "https://localhost/threads/callback?code=...&state=..."
 
-7. `Threadsの長期アクセストークンを保存しました` と表示されたら、
-   `targets.post` に `threads` を追加する
-8. `bin/post` でテスト投稿をキューへ入れ、他の未処理ジョブがないことを確認してから
+7. `Threadsの長期アクセストークンを保存しました` と表示されたら認証準備は完了。
+   通常運用でInstagram／FacebookからThreadsへ波及させる場合、`targets.watch` と
+   `targets.post` には `threads` を追加しない
+8. `bin/post --target threads "テスト本文"` でテスト投稿をキューへ入れ、他の未処理ジョブが
+   ないことを確認してから
    `bin/run_queue` を実行する。`ok threads` と投稿IDが表示され、Threads上で投稿を
    確認できれば設定完了
+
+現在の実運用では、Threadsの画像付き投稿はInstagramから、テキストだけの投稿はFacebookから
+波及させる。Threads APIは波及が使えない場合の予備・テスト経路として維持し、必要なときだけ
+`--target threads` を明示する。最新Fedibird投稿の公開画像を使う試験は、静止画像付き投稿を
+Fedibirdへ投稿した後に次のように行う。
+
+    ruby bin/post --target threads --from-fedibird-latest
+    ruby bin/run_queue
 
 認証情報と長期トークンは表示・Git管理しない。認可をやり直す場合も
 `--authorize` から開始し、新しい `state` を使う。

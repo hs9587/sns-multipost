@@ -35,6 +35,7 @@ threads:
   redirect_uri: "https://localhost/threads/callback"  # Meta側にも同じURLを登録
   # 通常は bin/threads_auth で state/threads_token.json に長期トークンを保存する。
   # 手動取得したトークンを直接使う場合だけ access_token を記入する。
+  # Instagram/Facebookから波及させる運用ではtargetsへ常設せず、明示的な--targetによる予備経路にする。
   access_token: ""
 
 jotter:
@@ -55,7 +56,6 @@ targets:
     - bluesky
     - tumblr
     - blogger
-    - threads
     - mixi
     - mixi2
     - jotter
