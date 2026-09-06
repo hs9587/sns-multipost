@@ -92,6 +92,9 @@ Fedibirdへ投稿した後に次のように行う。
     ruby bin/post --target threads --from-fedibird-latest
     ruby bin/run_queue
 
+この経路は単画像に加えて複数画像カルーセルにも対応し、2026-09-06に静止画像2枚を
+1件のThreads投稿として公開できることを実地確認済み。
+
 認証情報と長期トークンは表示・Git管理しない。認可をやり直す場合も
 `--authorize` から開始し、新しい `state` を使う。
 
