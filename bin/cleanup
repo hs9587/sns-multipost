@@ -4,20 +4,28 @@ require "cli"
 require "cleanup"
 
 dry_run = false
+apply = false
+include_browser_cache = false
 days = 30
 limit = 10
 parser = SnsMultipost::Cli.parser(
-  banner: "Usage: ruby bin/cleanup --dry-run [options]",
-  description: "sns-multipostの古い完了ジョブ、未参照画像、孤立した失敗スクリーンショット、再生成可能なChromeキャッシュを調べます。\n現在は候補表示専用で、ファイルを削除しません。",
+  banner: "Usage: ruby bin/cleanup (--dry-run | --apply) [options]",
+  description: "sns-multipostの古い完了ジョブ、未参照画像、孤立した失敗スクリーンショット、再生成可能なChromeキャッシュを調査・清掃します。\n--dry-runで候補を確認し、同じ条件を--applyへ指定して削除します。",
   examples: ["ruby bin/cleanup --dry-run",
-             "ruby bin/cleanup --dry-run --days 14 --limit 20"],
+             "ruby bin/cleanup --dry-run --days 14 --limit 20",
+             "ruby bin/cleanup --apply --days 30",
+             "ruby bin/cleanup --apply --days 30 --include-browser-cache"],
   notes: ["queue/とfailed/が参照する画像、およびfailed/のJSONは候補にしません。",
           "ChromeのCookie、Local Storage、IndexedDB、Service Worker、ログイン情報は候補にしません。",
           "JotterのBrowser ID・DEN・暗号化データに関わり得るIndexedDBは保護します。",
-          "Chromeキャッシュ候補に経過日数は適用しません。将来削除する場合は専用Chromeをすべて閉じます。",
+          "Chromeキャッシュ候補に経過日数は適用しません。削除する場合は専用Chromeをすべて閉じ、--include-browser-cacheを指定します。",
           "--limitは各分類の表示件数だけを変え、候補の集計件数には影響しません。"]
 ) do |opts|
-  opts.on("--dry-run", "削除せず候補だけを表示（現在は必須）") { dry_run = true }
+  opts.on("--dry-run", "削除せず候補だけを表示") { dry_run = true }
+  opts.on("--apply", "候補を削除（Chromeキャッシュを除く）") { apply = true }
+  opts.on("--include-browser-cache", "再生成可能なChromeキャッシュも削除（--apply時のみ）") do
+    include_browser_cache = true
+  end
   opts.on("--days N", Integer, "N日以上経過したファイルを候補にする（既定: 30）") do |value|
     days = value
   end
@@ -27,8 +35,11 @@ parser = SnsMultipost::Cli.parser(
 end
 SnsMultipost::Cli.parse!(parser)
 SnsMultipost::Cli.reject_arguments!(parser)
-unless dry_run
-  SnsMultipost::Cli.usage_error(parser, "現在は安全確認のため--dry-runだけを提供しています")
+unless dry_run ^ apply
+  SnsMultipost::Cli.usage_error(parser, "--dry-runまたは--applyのどちらか一方を指定してください")
+end
+if include_browser_cache && !apply
+  SnsMultipost::Cli.usage_error(parser, "--include-browser-cacheは--applyと一緒に指定してください")
 end
 unless days.between?(1, 3650)
   SnsMultipost::Cli.usage_error(parser, "--daysは1以上3650以下にしてください")
@@ -37,5 +48,12 @@ unless limit.between?(1, 100)
   SnsMultipost::Cli.usage_error(parser, "--limitは1以上100以下にしてください")
 end
 
-report = SnsMultipost::Cleanup.new.scan(days: days)
-puts SnsMultipost::Cleanup.format(report, limit: limit)
+cleanup = SnsMultipost::Cleanup.new
+report = cleanup.scan(days: days)
+if dry_run
+  puts SnsMultipost::Cleanup.format(report, limit: limit)
+else
+  result = cleanup.apply(report, include_browser_cache: include_browser_cache)
+  puts SnsMultipost::Cleanup.format_apply(result)
+  exit 1 unless result.failed.empty?
+end

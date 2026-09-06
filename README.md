@@ -151,7 +151,7 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 
 ## ロードマップ
 
-1. `cleanup --dry-run` の確認結果を基に、古いジョブ・画像・再生成可能なChromeキャッシュの実清掃方針を決める
+1. `cleanup --apply` の初回運用で、古いジョブ・画像・再生成可能なChromeキャッシュの清掃結果を確認する
 2. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
 
 従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
@@ -177,14 +177,17 @@ Blogger編集画面の「パソコンからアップロード」を自動操作�
 参照されなくなった画像、失敗スクリーンショット、Chromeキャッシュの順にローテーションを検討する。
 失敗ジョブ本体は、再実行や原因調査が済むまで自動削除しない。
 
-削除候補は、現在は読取り専用の次のコマンドで確認する。既定では30日以上経過した完了ジョブ、
+削除候補は、まず読取り専用の次のコマンドで確認する。既定では30日以上経過した完了ジョブ、
 未処理ジョブから参照されない画像、対応JSONのない失敗スクリーンショットと、再生成可能な
 Chromeキャッシュを分類する。JotterのIndexedDBを含むログイン・ウォレット関連状態は保護する。
 
     ruby bin/cleanup --dry-run
 
-表示対象の日数と各分類の表示件数は `--days N`、`--limit N` で変更できる。このコマンドには
-削除機能がなく、実際のローテーション規則は候補を確認してから決める。
+表示対象の日数と各分類の表示件数は `--days N`、`--limit N` で変更できる。確認したのと同じ
+`--days` を指定して `ruby bin/cleanup --apply --days N` を実行すると、Chromeキャッシュ以外の候補を
+削除する。再生成可能なChromeキャッシュも削除する場合は、専用Chromeをすべて閉じてから
+`--include-browser-cache` を追加する。`failed/*.json` と参照中画像、Cookie、Local Storage、IndexedDB、
+Service Worker、ログイン情報はどちらの実行でも削除しない。
 
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
 API投稿先の実装記録は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、

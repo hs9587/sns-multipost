@@ -1,4 +1,5 @@
 require "json"
+require "fileutils"
 require "pathname"
 require "time"
 
@@ -8,6 +9,7 @@ module SnsMultipost
     Report = Struct.new(
       :cutoff, :done, :orphan_screenshots, :media, :browser_cache,
       :warnings, :protected_failed_jobs, :protected_media, keyword_init: true)
+    ApplyResult = Struct.new(:removed, :failed, :skipped_browser_cache, keyword_init: true)
 
     CACHE_NAMES = [
       "cache", "code cache", "gpucache", "grshadercache", "shadercache",
@@ -36,6 +38,32 @@ module SnsMultipost
         protected_media: protected_media)
     end
 
+    def apply(report, include_browser_cache: false)
+      removed = []
+      failed = []
+      items = report.done + report.orphan_screenshots + report.media
+      items += report.browser_cache if include_browser_cache
+
+      items.each do |entry|
+        path = cleanup_path(entry.path)
+        next unless File.exist?(path) || File.symlink?(path)
+
+        if File.directory?(path) && !File.symlink?(path)
+          FileUtils.remove_entry_secure(path)
+        else
+          File.delete(path)
+        end
+        removed << entry
+      rescue StandardError => e
+        failed << [entry, e]
+      end
+
+      ApplyResult.new(
+        removed: removed,
+        failed: failed,
+        skipped_browser_cache: include_browser_cache ? [] : report.browser_cache)
+    end
+
     def self.format(report, limit: 10)
       lines = [
         "cleanup dry-run（削除は行いません）",
@@ -54,6 +82,23 @@ module SnsMultipost
       lines << "保護: ChromeのCookie・Local Storage・IndexedDB・Service Worker・ログイン情報"
       report.warnings.each { |warning| lines << "警告: #{warning}" }
       lines << "一覧は候補確認だけです。Chromeプロファイルを清掃する場合は専用Chromeをすべて閉じる必要があります。"
+      lines.join("\n")
+    end
+
+    def self.format_apply(result)
+      lines = [
+        "cleanup apply",
+        "削除完了: #{result.removed.length}件 #{format_bytes(result.removed.sum(&:bytes))}"
+      ]
+      unless result.skipped_browser_cache.empty?
+        lines << "Chromeキャッシュは未削除: #{result.skipped_browser_cache.length}件 " \
+                 "#{format_bytes(result.skipped_browser_cache.sum(&:bytes))}"
+        lines << "削除する場合は専用Chromeをすべて閉じ、--include-browser-cacheを追加してください。"
+      end
+      result.failed.each do |entry, error|
+        lines << "削除失敗: #{entry.path.tr('\\', '/')}（#{error.class}: #{error.message}）"
+      end
+      lines << "失敗: #{result.failed.length}件"
       lines.join("\n")
     end
 
@@ -78,8 +123,42 @@ module SnsMultipost
 
     private
 
+    def cleanup_path(relative_path)
+      relative = Pathname.new(relative_path.to_s)
+      raise ArgumentError, "絶対パスは削除対象にできません" if relative.absolute?
+
+      path = File.expand_path(relative.to_s, @root)
+      root_prefix = @root.end_with?(File::SEPARATOR) ? @root : "#{@root}#{File::SEPARATOR}"
+      unless path.start_with?(root_prefix) && allowed_cleanup_path?(path)
+        raise ArgumentError, "許可されていない削除対象です: #{relative_path}"
+      end
+      path
+    end
+
+    def allowed_cleanup_path?(path)
+      relative = Pathname.new(path).relative_path_from(Pathname.new(@root)).each_filename.to_a
+      direct_json = relative.length == 2 && relative.first == "done" &&
+                    relative.last.end_with?(".json")
+      direct_png = relative.length == 2 && relative.first == "failed" &&
+                   relative.last.end_with?(".png")
+      direct_json || direct_png || media_directory?(relative) ||
+        browser_cache_directory?(relative)
+    end
+
+    def media_directory?(parts)
+      parts.length == 3 && parts[0, 2] == ["state", "media"]
+    end
+
+    def browser_cache_directory?(parts)
+      parts.length >= 4 && parts[0, 2] == ["state", "browser"] &&
+        CACHE_NAMES.include?(parts.last.downcase) &&
+        parts.none? { |part| part.casecmp?("Storage") }
+    end
+
     def files(directory, pattern)
-      Dir[File.join(@root, directory, pattern)].select { |path| File.file?(path) }
+      Dir.glob(File.join(directory, pattern), base: @root)
+         .map { |path| File.join(@root, path) }
+         .select { |path| File.file?(path) }
     end
 
     def old_files(directory, pattern, cutoff)
@@ -113,7 +192,8 @@ module SnsMultipost
     end
 
     def media_candidates(cutoff, references, readable)
-      directories = Dir[File.join(@root, "state", "media", "*")]
+      directories = Dir.glob(File.join("state", "media", "*"), base: @root)
+                    .map { |path| File.join(@root, path) }
                     .select { |path| File.directory?(path) }
       protected_count = directories.count { |path| references[File.expand_path(path)] }
       return [[], protected_count] unless readable
@@ -130,7 +210,8 @@ module SnsMultipost
       browser_root = File.join(@root, "state", "browser")
       return [] unless File.directory?(browser_root)
 
-      candidates = Dir[File.join(browser_root, "**", "*")].select do |path|
+      candidates = Dir.glob(File.join("state", "browser", "**", "*"), base: @root)
+                      .map { |path| File.join(@root, path) }.select do |path|
         File.directory?(path) && CACHE_NAMES.include?(File.basename(path).downcase) &&
           !storage_path?(path)
       end.sort_by(&:length)
@@ -149,7 +230,10 @@ module SnsMultipost
     end
 
     def directory_item(path)
-      entries = Dir[File.join(path, "**", "*")].select { |entry| File.file?(entry) }
+      base = relative(path)
+      entries = Dir.glob(File.join(base, "**", "*"), base: @root)
+                   .map { |entry| File.join(@root, entry) }
+                   .select { |entry| File.file?(entry) }
       updated = entries.map { |entry| File.mtime(entry) }.max || File.mtime(path)
       Item.new(path: relative(path), bytes: entries.sum { |entry| File.size(entry) },
                updated_at: updated)

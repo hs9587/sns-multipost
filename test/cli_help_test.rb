@@ -115,17 +115,27 @@ class CliHelpTest < Minitest::Test
     end
   end
 
-  def test_cleanup_help_and_dry_run_requirement
+  def test_cleanup_help_and_mode_requirement
     stdout, _stderr, status = run_cli("cleanup", "--help")
     assert status.success?
     assert_includes stdout, "--dry-run"
+    assert_includes stdout, "--apply"
+    assert_includes stdout, "--include-browser-cache"
     assert_includes stdout, "--days N"
     assert_includes stdout, "IndexedDBは保護"
-    assert_includes stdout, "ファイルを削除しません"
+    assert_includes stdout, "専用Chromeをすべて閉じ"
 
     _stdout, stderr, status = run_cli("cleanup")
     assert_equal 2, status.exitstatus
-    assert_includes stderr, "--dry-runだけを提供"
+    assert_includes stderr, "どちらか一方"
+
+    _stdout, stderr, status = run_cli("cleanup", "--dry-run", "--apply")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "どちらか一方"
+
+    _stdout, stderr, status = run_cli("cleanup", "--dry-run", "--include-browser-cache")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "--applyと一緒"
   end
 
   def test_dryrun_titles_help_explains_dictionary_check_without_posting
