@@ -1,6 +1,7 @@
 require "net/http"
 require "json"
 require "uri"
+require_relative "http_transport"
 
 module SnsMultipost
   class ThreadsApi
@@ -9,11 +10,7 @@ module SnsMultipost
     FAILED_STATUSES = %w[ERROR EXPIRED].freeze
     DEFAULT_STATUS_ATTEMPTS = 60
 
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     def initialize(access_token:, base_url: BASE, transport: DEFAULT_TRANSPORT,
                    sleeper: ->(seconds) { sleep seconds },

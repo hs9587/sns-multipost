@@ -1,14 +1,11 @@
 require "net/http"
 require "json"
 require "uri"
+require_relative "http_transport"
 
 module SnsMultipost
   module OAuthRefresh
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     # refresh token でトークン一式を更新し、レスポンス JSON 全体を Hash で返す
     def self.refresh(token_uri:, client_id:, client_secret:, refresh_token:,

@@ -29,6 +29,7 @@
 - Tumblrの短命トークンとローテーション型refresh tokenは自動更新・永続化済み
 - Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり。`bin/task_run` が両方の終了コードを記録し、`bin/task` で状態確認、登録・解除、有効化・一時停止ができる
 - `bin/task` は最後に記録した定期実行異常とdone最新時刻以降のfailedを表示し、`bin/failed_jobs` では古い保留分を含む履歴をページ指定して確認できる
+- API通信は接続・読取り・書込みの時間上限を共通化し、安全に未送信と判断できる接続失敗と冪等な取得処理だけを自動再試行する
 - mixi / mixi2 / Jotter.meは、画面要素の再取得、画像処理待ち、ログイン中アカウントと投稿個別画面の確認を強化済み
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
 - XはOAuth 1.0a認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
@@ -137,7 +138,7 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 
 ## ロードマップ
 
-1. ページング、HTTPタイムアウト、監視・キュー書込み側への排他制御拡張、古いジョブ・画像の清掃など、安全性と安定性を高める
+1. ページング、監視・キュー書込み側への排他制御拡張、古いジョブ・画像の清掃など、安全性と安定性を高める
 2. Threadsの複数画像カルーセルを実地確認し、APIを予備経路として維持する
 3. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
 
@@ -169,4 +170,5 @@ API投稿先の実装記録は [docs/specs/2026-07-20-sns-multipost-phase2-desig
 Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-threads-api.md)、
 ブラウザ投稿先の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
 Jotter画像とDEN運用は [docs/specs/2026-08-15-jotter-image-den.md](docs/specs/2026-08-15-jotter-image-den.md)、
+API通信の安全な再試行は [docs/specs/2026-09-06-http-reliability.md](docs/specs/2026-09-06-http-reliability.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

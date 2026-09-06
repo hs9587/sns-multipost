@@ -1,17 +1,14 @@
 require "net/http"
 require "json"
 require "uri"
+require_relative "http_transport"
 
 module SnsMultipost
   module ThreadsOAuth
     AUTHORIZE_URI = "https://threads.net/oauth/authorize".freeze
     API_BASE = "https://graph.threads.net".freeze
 
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     module_function
 

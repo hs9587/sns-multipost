@@ -4,17 +4,14 @@ require "json"
 require "uri"
 require "securerandom"
 require_relative "oauth1"
+require_relative "http_transport"
 
 module SnsMultipost
   class XApi
     BASE = "https://api.twitter.com".freeze
     UPLOAD_BASE = "https://api.twitter.com".freeze
 
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     def initialize(consumer_key:, consumer_secret:, access_token:, access_token_secret:,
                    base_url: BASE, upload_base_url: UPLOAD_BASE,

@@ -35,7 +35,9 @@ module SnsMultipost
       end
     end
 
-    def self.download(urls, dest_dir, fetcher: ->(u) { URI.open(u, "rb", &:read) })
+    def self.download(
+      urls, dest_dir,
+      fetcher: ->(u) { URI.open(u, "rb", open_timeout: 10, read_timeout: 30, &:read) })
       FileUtils.mkdir_p(dest_dir)
       urls.each_with_index.map do |url, i|
         ext = File.extname(URI(url).path)

@@ -1,16 +1,13 @@
 require "net/http"
 require "json"
 require "uri"
+require_relative "http_transport"
 
 module SnsMultipost
   class BloggerApi
     BASE = "https://www.googleapis.com".freeze
 
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     def initialize(blog_id:, access_token:, base_url: BASE, transport: DEFAULT_TRANSPORT)
       @base = URI(base_url)

@@ -56,6 +56,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "先に ruby bin/watch"
     assert_includes stdout, "Bloggerは本文をAPI投稿"
     assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
+    assert_includes stdout, "結果不明の投稿POSTは二重投稿防止のため再送しません"
   end
 
   def test_task_help_explains_cross_shell_status_and_switches

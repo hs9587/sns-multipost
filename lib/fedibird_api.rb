@@ -2,14 +2,11 @@ require "net/http"
 require "json"
 require "uri"
 require "securerandom"
+require_relative "http_transport"
 
 module SnsMultipost
   class FedibirdApi
-    DEFAULT_TRANSPORT = lambda do |req, base|
-      Net::HTTP.start(base.host, base.port, use_ssl: base.scheme == "https") do |http|
-        http.request(req)
-      end
-    end
+    DEFAULT_TRANSPORT = HttpTransport.method(:call)
 
     def initialize(base_url:, access_token:, transport: DEFAULT_TRANSPORT)
       @base = URI(base_url)

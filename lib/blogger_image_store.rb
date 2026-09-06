@@ -5,6 +5,7 @@ require "open-uri"
 require "tmpdir"
 require "uri"
 require_relative "blogger_image_browser"
+require_relative "http_transport"
 require_relative "token_store"
 
 module SnsMultipost
@@ -12,13 +13,13 @@ module SnsMultipost
     SCRATCH_TITLE = "sns-multipost 画像アップロード作業用（公開しない）".freeze
     DEFAULT_CACHE_PATH = File.expand_path("../state/blogger_image_store.json", __dir__)
 
-    DEFAULT_FETCHER = ->(url) { URI.open(url, "rb", &:read) }
+    DEFAULT_FETCHER = lambda do |url|
+      URI.open(url, "rb", open_timeout: 10, read_timeout: 30, &:read)
+    end
     DEFAULT_VALIDATOR = lambda do |url|
       uri = URI(url)
       request = Net::HTTP::Head.new(uri.request_uri)
-      response = Net::HTTP.start(
-        uri.host, uri.port, use_ssl: uri.scheme == "https",
-        open_timeout: 10, read_timeout: 20) { |http| http.request(request) }
+      response = HttpTransport.call(request, uri)
       type = response["Content-Type"].to_s
       response.code.to_i.between?(200, 299) && type.start_with?("image/")
     end
