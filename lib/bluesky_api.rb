@@ -45,7 +45,8 @@ module SnsMultipost
         }
       end
       post_json("/xrpc/com.atproto.repo.createRecord",
-                { repo: @did, collection: "app.bsky.feed.post", record: record })
+                { repo: @did, collection: "app.bsky.feed.post", record: record },
+                delivery: true)
     end
 
     private
@@ -59,10 +60,11 @@ module SnsMultipost
       end
     end
 
-    def post_json(path, hash, auth: true)
+    def post_json(path, hash, auth: true, delivery: false)
       req = Net::HTTP::Post.new(path)
       req["Content-Type"] = "application/json"
       req.body = JSON.generate(hash)
+      HttpTransport.mark_delivery(req) if delivery
       request(req, auth: auth)
     end
 

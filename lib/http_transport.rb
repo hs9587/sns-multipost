@@ -1,6 +1,7 @@
 require "net/http"
 require "socket"
 require "timeout"
+require_relative "delivery_error"
 
 module SnsMultipost
   class HttpTransport
@@ -10,10 +11,20 @@ module SnsMultipost
     ATTEMPTS = 3
     IDEMPOTENT_METHODS = %w[GET HEAD PUT DELETE OPTIONS TRACE].freeze
     RETRYABLE_CODES = [408, 425, 429, 500, 502, 503, 504].freeze
+    DELIVERY_MARKER = :@sns_multipost_delivery_request
 
     def self.call(request, base)
       @default ||= new
       @default.call(request, base)
+    end
+
+    def self.mark_delivery(request)
+      request.instance_variable_set(DELIVERY_MARKER, true)
+      request
+    end
+
+    def self.delivery_request?(request)
+      request.instance_variable_get(DELIVERY_MARKER) == true
     end
 
     def initialize(open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT,
@@ -31,6 +42,7 @@ module SnsMultipost
 
     def call(request, base)
       idempotent = IDEMPOTENT_METHODS.include?(request.method.to_s.upcase)
+      delivery = self.class.delivery_request?(request)
       @attempts.times do |attempt|
         begin
           response = @performer.call(request, base)
@@ -38,8 +50,15 @@ module SnsMultipost
             pause(request, base, attempt, "HTTP #{response.code}")
             next
           end
+          if delivery && delivery_unknown_response?(response)
+            raise DeliveryUnknownError,
+                  "#{request.method} #{base.host} returned HTTP #{response.code}; delivery result is unknown"
+          end
           return response
         rescue StandardError => e
+          if delivery && delivery_unknown_exception?(e)
+            raise DeliveryUnknownError.wrap(e, context: "#{request.method} #{base.host}")
+          end
           raise unless retry_left?(attempt) && retryable_exception?(e, idempotent)
 
           pause(request, base, attempt, "#{e.class}: #{e.message}")
@@ -78,6 +97,14 @@ module SnsMultipost
         (defined?(Net::WriteTimeout) && error.is_a?(Net::WriteTimeout)) ||
         error.is_a?(EOFError) ||
         system_error?(error, :ECONNRESET, :ETIMEDOUT, :EPIPE)
+    end
+
+    def delivery_unknown_exception?(error)
+      !error.is_a?(DeliveryUnknownError) && transient_error?(error)
+    end
+
+    def delivery_unknown_response?(response)
+      [408, 500, 502, 503, 504].include?(response.code.to_i)
     end
 
     def system_error?(error, *names)

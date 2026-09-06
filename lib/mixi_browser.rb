@@ -1,4 +1,5 @@
 require "fileutils"
+require_relative "delivery_error"
 require_relative "browser_profile"
 
 module SnsMultipost
@@ -113,6 +114,7 @@ module SnsMultipost
     end
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
+      submission_started = false
       open_home
       entered = wait_for { browser.evaluate(SET_TEXT_JS, text) }
       raise "mixiのつぶやき本文を入力できません" unless entered
@@ -132,8 +134,16 @@ module SnsMultipost
 
       expected = normalize_match_text(text)[0, 40]
       existing_urls = browser.evaluate(POST_URLS_JS, expected)
-      submitted = wait_for { browser.evaluate(CLICK_SUBMIT_JS) }
+      submitted = wait_for do
+        begin
+          browser.evaluate(CLICK_SUBMIT_JS)
+        rescue StandardError
+          submission_started = true
+          raise
+        end
+      end
       raise "mixiのつぶやくボタンを押せません" unless submitted
+      submission_started = true
 
       confirmation_timeout = media_paths.empty? ? @timeout : [@timeout * 3, 60].max
       url = wait_for(timeout: confirmation_timeout) do
@@ -145,9 +155,9 @@ module SnsMultipost
       end
       raise "mixiの新しいつぶやきを確認できません" unless url
       { posted: true, url: url }
-    rescue StandardError
+    rescue StandardError => e
       capture_failure_screenshot(failure_screenshot_path)
-      raise
+      raise(submission_started ? DeliveryUnknownError.wrap(e, context: "mixi送信後") : e)
     ensure
       browser.quit if @owns_browser && @browser
     end

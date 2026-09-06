@@ -1,4 +1,5 @@
 require "fileutils"
+require_relative "delivery_error"
 require "digest"
 require "net/http"
 require "socket"
@@ -361,6 +362,7 @@ module SnsMultipost
 
     def post(text:, media_paths: [], expected_browser_id_fingerprint: nil,
              failure_screenshot_path: nil)
+      submission_started = false
       paths = Array(media_paths).first(1)
       wallet = nil
       unless paths.empty?
@@ -398,6 +400,7 @@ module SnsMultipost
 
       submit = wait_for { safe_at_css(SUBMIT_SELECTOR) }
       raise "JotterのPostボタンが見つかりません" unless submit
+      submission_started = true
       submit.click
 
       expected = text[0, 40]
@@ -414,9 +417,9 @@ module SnsMultipost
       end
       raise "Jotterの新しい公開投稿の個別画面を確認できません" unless detail
       { posted: true, url: url }
-    rescue StandardError
+    rescue StandardError => e
       capture_failure_screenshot(failure_screenshot_path)
-      raise
+      raise(submission_started ? DeliveryUnknownError.wrap(e, context: "Jotter送信後") : e)
     ensure
       close_owned_browser
     end

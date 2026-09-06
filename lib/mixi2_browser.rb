@@ -1,5 +1,6 @@
 require_relative "browser_profile"
 require "fileutils"
+require_relative "delivery_error"
 
 module SnsMultipost
   class Mixi2Browser
@@ -152,6 +153,7 @@ module SnsMultipost
     end
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
+      submission_started = false
       state, _, composer = open_composer
       account_handle = state["accountHandle"]
 
@@ -172,6 +174,7 @@ module SnsMultipost
 
       submit = composer.at_css(SUBMIT_SELECTOR)
       raise "mixi2の送信ボタンが見つかりません" unless submit
+      submission_started = true
       submit.click
 
       closed = wait_for { !browser.evaluate(COMPOSER_JS)["opened"] }
@@ -196,9 +199,9 @@ module SnsMultipost
       end
       raise "mixi2の新しい投稿を確認できません" unless url
       { posted: true, url: url, account: "@#{account_handle}" }
-    rescue StandardError
+    rescue StandardError => e
       capture_failure_screenshot(failure_screenshot_path)
-      raise
+      raise(submission_started ? DeliveryUnknownError.wrap(e, context: "mixi2送信後") : e)
     ensure
       browser.quit if @owns_browser && @browser
     end

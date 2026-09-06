@@ -44,9 +44,11 @@ class HttpTransportTest < Minitest::Test
       raise Net::ReadTimeout
     end
 
-    assert_raises(Net::ReadTimeout) do
-      transport.call(Net::HTTP::Post.new("/posts"), URI("https://example.test"))
+    request = SnsMultipost::HttpTransport.mark_delivery(Net::HTTP::Post.new("/posts"))
+    error = assert_raises(SnsMultipost::DeliveryUnknownError) do
+      transport.call(request, URI("https://example.test"))
     end
+    assert_match(/結果を確認できません/, error.message)
     assert_equal 1, calls
   end
 
@@ -64,10 +66,25 @@ class HttpTransportTest < Minitest::Test
 
     assert_equal "200", get_transport.call(
       Net::HTTP::Get.new("/items"), URI("https://example.test")).code
-    assert_equal "503", post_transport.call(
-      Net::HTTP::Post.new("/posts"), URI("https://example.test")).code
+    request = SnsMultipost::HttpTransport.mark_delivery(Net::HTTP::Post.new("/posts"))
+    assert_raises(SnsMultipost::DeliveryUnknownError) do
+      post_transport.call(request, URI("https://example.test"))
+    end
     assert_equal 2, get_calls
     assert_equal 1, post_calls
+  end
+
+  def test_does_not_mark_auxiliary_post_as_unknown
+    calls = 0
+    transport = build_transport([]) do
+      calls += 1
+      raise Net::ReadTimeout
+    end
+
+    assert_raises(Net::ReadTimeout) do
+      transport.call(Net::HTTP::Post.new("/token"), URI("https://example.test"))
+    end
+    assert_equal 1, calls
   end
 
   private

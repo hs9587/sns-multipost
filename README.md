@@ -16,7 +16,7 @@
 - 認証情報とブラウザ状態は Git に入れない
 - 基本実装は Ruby。ブラウザ操作ライブラリは対象サービスごとの実証結果で決める
 
-## 現在の状態（2026-09-05）
+## 現在の状態（2026-09-06）
 
 - Fedibird監視、ファイルキュー、投稿実行、失敗ジョブの再試行からなる基盤は実装・運用確認済み
 - Fedibird / Bluesky / Tumblr / Threads はAPIによる実投稿を確認済み
@@ -30,6 +30,7 @@
 - Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり。`bin/task_run` が両方の終了コードを記録し、`bin/task` で状態確認、登録・解除、有効化・一時停止ができる
 - `bin/task` は最後に記録した定期実行異常とdone最新時刻以降のfailedを表示し、`bin/failed_jobs` では古い保留分を含む履歴をページ指定して確認できる
 - API通信は接続・読取り・書込みの時間上限を共通化し、安全に未送信と判断できる接続失敗と冪等な取得処理だけを自動再試行する
+- API応答待ち切れやブラウザ送信後の確認失敗は「投稿結果不明」として再試行を止め、投稿先の確認後に明示的に再試行または投稿済み解決を選べる
 - mixi / mixi2 / Jotter.meは、画面要素の再取得、画像処理待ち、ログイン中アカウントと投稿個別画面の確認を強化済み
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
 - XはOAuth 1.0a認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
@@ -110,6 +111,13 @@
 したがって `bin/post` 由来の自己投稿や返信は、巻き戻しても再配信されない。失敗ジョブの再実行には
 監視基準を戻さず `bin/retry` を使う。
 
+送信後の応答待ち切れなど、投稿済みか判断できない失敗には `failed/` の一覧で
+`[投稿結果不明]` と表示する。このジョブは通常の `retry` では再投稿しない。投稿先を確認し、
+未投稿なら再試行、投稿済みなら再投稿せず解決する。
+
+    ruby bin/retry --confirm-not-posted failed/x.json
+    ruby bin/retry --confirm-posted failed/x.json
+
 ローカル画像を投稿可能な全投稿先へ手動展開する場合、`--image` は `targets.post` のうち
 Fedibird / Bluesky / Tumblr / Blogger / mixi / mixi2 / Jotterのジョブを作る。
 ThreadsはMetaが取得できる公開画像URLを必要とするため、
@@ -171,4 +179,5 @@ Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-thre
 ブラウザ投稿先の調査状況は [docs/specs/2026-08-09-phase3-browser.md](docs/specs/2026-08-09-phase3-browser.md)、
 Jotter画像とDEN運用は [docs/specs/2026-08-15-jotter-image-den.md](docs/specs/2026-08-15-jotter-image-den.md)、
 API通信の安全な再試行は [docs/specs/2026-09-06-http-reliability.md](docs/specs/2026-09-06-http-reliability.md)、
+投稿結果不明時の重複防止は [docs/specs/2026-09-06-delivery-unknown.md](docs/specs/2026-09-06-delivery-unknown.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

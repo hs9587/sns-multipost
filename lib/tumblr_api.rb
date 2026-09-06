@@ -37,6 +37,7 @@ module SnsMultipost
         else
           build_multipart(path, body_json, image_paths)
         end
+      HttpTransport.mark_delivery(req)
       request(req)
     end
 

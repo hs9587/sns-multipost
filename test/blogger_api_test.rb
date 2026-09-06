@@ -12,7 +12,8 @@ class BloggerApiTest < Minitest::Test
     calls = []
     t = lambda do |req, base|
       calls << { method: req.method, host: base.host, path: req.path,
-                 ctype: req["Content-Type"], auth: req["Authorization"], body: req.body }
+                 ctype: req["Content-Type"], auth: req["Authorization"], body: req.body,
+                 delivery: SnsMultipost::HttpTransport.delivery_request?(req) }
       FakeResp.new(*responses.shift)
     end
     [t, calls]
@@ -36,6 +37,7 @@ class BloggerApiTest < Minitest::Test
     assert_equal "blogger#post", body["kind"]
     assert_equal "タイトル", body["title"]
     assert_equal "<p>本文</p>", body["content"]
+    assert c[:delivery]
   end
 
   def test_non_2xx_raises
@@ -52,6 +54,7 @@ class BloggerApiTest < Minitest::Test
     api.insert_post(title: "scratch", html: "", is_draft: true)
 
     assert_equal "/blogger/v3/blogs/42/posts?isDraft=true", calls.first[:path]
+    refute calls.first[:delivery]
   end
 
   def test_delete_post_accepts_empty_success_and_not_found

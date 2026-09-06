@@ -276,7 +276,7 @@ class JotterBrowserTest < Minitest::Test
   def test_post_requires_text_on_individual_post_page
     browser = FakeBrowser.new(post_detail: false)
 
-    error = assert_raises(RuntimeError) do
+    error = assert_raises(SnsMultipost::DeliveryUnknownError) do
       client(browser).post(text: "個別画面確認")
     end
 
@@ -387,7 +387,7 @@ class JotterBrowserTest < Minitest::Test
     Dir.mktmpdir do |dir|
       browser = FakeBrowser.new(confirm_post: false)
       path = File.join(dir, "failed", "job.png")
-      assert_raises(RuntimeError) do
+      assert_raises(SnsMultipost::DeliveryUnknownError) do
         client(browser).post(text: "失敗", failure_screenshot_path: path)
       end
       assert_equal({ path: path, full: false }, browser.screenshot_call)

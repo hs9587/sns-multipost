@@ -155,7 +155,7 @@ class MixiBrowserTest < Minitest::Test
       browser = FakeBrowser.new(post_url: false)
       path = File.join(dir, "failed", "job.png")
 
-      error = assert_raises(RuntimeError) do
+      error = assert_raises(SnsMultipost::DeliveryUnknownError) do
         SnsMultipost::MixiBrowser.new(
           browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
             text: "失敗", failure_screenshot_path: path)

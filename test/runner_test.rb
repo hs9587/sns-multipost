@@ -3,6 +3,7 @@ require "runner"
 require "config"
 require "job_queue"
 require "poster/all"
+require "delivery_error"
 
 class RunnerTest < Minitest::Test
   def test_exit_status_is_zero_when_all_jobs_succeed
@@ -32,6 +33,29 @@ class RunnerTest < Minitest::Test
       assert_equal 1, Dir[File.join(dir, "failed", "*.json")].size
       failed = JSON.parse(File.read(Dir[File.join(dir, "failed", "*.json")].first))
       assert_match(/poster 未実装/, failed["last_error"])
+    end
+  end
+
+  def test_marks_delivery_unknown_failure_in_job
+    Dir.mktmpdir do |dir|
+      name = "unknown-delivery-test"
+      klass = Class.new(SnsMultipost::Poster::Base) do
+        def perform(_job)
+          raise SnsMultipost::DeliveryUnknownError, "confirmation timed out"
+        end
+      end
+      SnsMultipost::Poster::REGISTRY[name] = klass
+      config = SnsMultipost::Config.new({ "dry_run" => false })
+      queue = SnsMultipost::JobQueue.new(dir)
+      queue.enqueue(SnsMultipost::Job.new(sns: name, text: "a"))
+
+      SnsMultipost::Runner.new(config: config, queue: queue).run
+
+      failed = JSON.parse(File.read(Dir[File.join(dir, "failed", "*.json")].first))
+      assert_equal "unknown", failed["delivery_state"]
+      assert_match(/DeliveryUnknownError/, failed["last_error"])
+    ensure
+      SnsMultipost::Poster::REGISTRY.delete(name)
     end
   end
 end

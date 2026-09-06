@@ -13,7 +13,8 @@ class TumblrApiTest < Minitest::Test
     calls = []
     t = lambda do |req, base|
       calls << { method: req.method, path: req.path, ctype: req["Content-Type"],
-                 auth: req["Authorization"], body: req.body, host: base.host }
+                 auth: req["Authorization"], body: req.body, host: base.host,
+                 delivery: SnsMultipost::HttpTransport.delivery_request?(req) }
       FakeResp.new(*responses.shift)
     end
     [t, calls]
@@ -33,6 +34,7 @@ class TumblrApiTest < Minitest::Test
     assert_equal "/v2/blog/hs9587.tumblr.com/posts", c[:path]
     assert_equal "api.tumblr.com", c[:host]
     assert_equal "Bearer TOK", c[:auth]
+    assert c[:delivery]
     assert_match(%r{application/json}, c[:ctype])
     body = JSON.parse(c[:body])
     assert_equal [{ "type" => "text", "text" => "こんにちは" }], body["content"]

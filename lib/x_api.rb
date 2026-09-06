@@ -57,6 +57,7 @@ module SnsMultipost
       req["Content-Type"] = "application/json"
       req["Authorization"] = sign("POST", full)
       req.body = JSON.generate(payload)
+      HttpTransport.mark_delivery(req)
       send_request(req, @base)
     end
 

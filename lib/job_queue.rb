@@ -4,7 +4,8 @@ require "fileutils"
 
 module SnsMultipost
   class Job
-    ATTRS = %w[sns text title media_paths media_urls source_url attempts last_error created_at].freeze
+    ATTRS = %w[sns text title media_paths media_urls source_url attempts last_error
+               delivery_state created_at].freeze
     attr_accessor(*ATTRS.map(&:to_sym))
     attr_reader :path
 
@@ -54,10 +55,22 @@ module SnsMultipost
       move(job.path, "failed")
     end
 
-    def requeue(path)
+    def requeue(path, confirmed_not_delivered: false)
+      if confirmed_not_delivered
+        data = JSON.parse(File.read(path))
+        data["delivery_state"] = nil
+        File.write(path, JSON.pretty_generate(data))
+      end
       dest = File.join(@root, "queue", File.basename(path))
       FileUtils.mv(path, dest)
       dest
+    end
+
+    def resolve_as_posted(path)
+      data = JSON.parse(File.read(path))
+      data["delivery_state"] = "confirmed_posted"
+      File.write(path, JSON.pretty_generate(data))
+      move(path, "done")
     end
 
     private

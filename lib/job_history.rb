@@ -1,4 +1,5 @@
 require "time"
+require "json"
 
 module SnsMultipost
   module JobHistory
@@ -22,6 +23,9 @@ module SnsMultipost
         latest_done: done_jobs.first,
         latest_done_timestamp: latest_done_timestamp,
         failed_jobs: selected,
+        delivery_states: selected.to_h do |name|
+          [name, delivery_state(failed_directory, name)]
+        end.compact,
         all_failed_count: failed_jobs.length,
         include_all: include_all
       }
@@ -37,7 +41,7 @@ module SnsMultipost
               end
       jobs = history.fetch(:failed_jobs)
       lines << "#{label}: #{jobs.length}件（保留分を含む・自動判定ではありません）"
-      jobs.first(limit).each { |name| lines << "  #{name}" }
+      jobs.first(limit).each { |name| lines << "  #{job_label(history, name)}" }
       remaining = jobs.length - limit
       lines << "  ほか#{remaining}件" if remaining.positive?
       lines.join("\n")
@@ -61,7 +65,7 @@ module SnsMultipost
         lines << "表示: 0件"
       else
         lines << "表示: #{offset + 1}～#{offset + shown.length}件目 / #{jobs.length}件"
-        shown.each { |name| lines << "  #{name}" }
+        shown.each { |name| lines << "  #{job_label(history, name)}" }
       end
       lines.join("\n")
     end
@@ -77,6 +81,18 @@ module SnsMultipost
 
     def timestamp(name)
       name.to_s[TIMESTAMP_PATTERN, 1]
+    end
+
+    def delivery_state(directory, name)
+      data = JSON.parse(File.read(File.join(directory, name)))
+      data["delivery_state"].to_s.then { |state| state.empty? ? nil : state }
+    rescue Errno::ENOENT, JSON::ParserError
+      nil
+    end
+
+    def job_label(history, name)
+      state = history.fetch(:delivery_states, {})[name]
+      state == "unknown" ? "#{name} [投稿結果不明]" : name
     end
 
     def format_timestamp(value)

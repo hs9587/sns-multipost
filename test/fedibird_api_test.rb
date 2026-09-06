@@ -32,6 +32,7 @@ class FedibirdApiTest < Minitest::Test
     assert_equal "こんにちは", body["status"]
     assert_equal ["5"], body["media_ids"]
     assert_equal "application/json", captured["Content-Type"]
+    assert SnsMultipost::HttpTransport.delivery_request?(captured)
   end
 
   def test_upload_media_multipart
@@ -45,6 +46,7 @@ class FedibirdApiTest < Minitest::Test
       assert_match %r{\Amultipart/form-data; boundary=}, captured["Content-Type"]
       assert_includes captured.body, "PNGDATA"
       assert_includes captured.body, 'filename="a.png"'
+      refute SnsMultipost::HttpTransport.delivery_request?(captured)
     end
   end
 

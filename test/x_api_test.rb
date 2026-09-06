@@ -13,7 +13,8 @@ class XApiTest < Minitest::Test
     calls = []
     t = lambda do |req, base|
       calls << { method: req.method, host: base.host, path: req.path,
-                 ctype: req["Content-Type"], auth: req["Authorization"], body: req.body }
+                 ctype: req["Content-Type"], auth: req["Authorization"], body: req.body,
+                 delivery: SnsMultipost::HttpTransport.delivery_request?(req) }
       FakeResp.new(*responses.shift)
     end
     [t, calls]
@@ -39,6 +40,7 @@ class XApiTest < Minitest::Test
     body = JSON.parse(c[:body])
     assert_equal "やあ", body["text"]
     refute body.key?("media")
+    assert c[:delivery]
   end
 
   def test_create_tweet_with_media_ids_adds_media_block
@@ -63,6 +65,7 @@ class XApiTest < Minitest::Test
       assert_includes c[:body], "PNGBYTES"
       assert_includes c[:body], "name=\"media_category\""
       assert_includes c[:body], "tweet_image"
+      refute c[:delivery]
     end
   end
 

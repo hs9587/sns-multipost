@@ -29,6 +29,7 @@ module SnsMultipost
       req = Net::HTTP::Post.new("/api/v1/statuses")
       req["Content-Type"] = "application/json"
       req.body = JSON.generate({ status: text, media_ids: media_ids })
+      HttpTransport.mark_delivery(req)
       request(req)
     end
 

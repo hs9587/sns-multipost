@@ -14,7 +14,8 @@ class BlueskyApiTest < Minitest::Test
     calls = []
     t = lambda do |req, base|
       calls << { method: req.method, path: req.path, ctype: req["Content-Type"],
-                 auth: req["Authorization"], body: req.body, host: base.host }
+                 auth: req["Authorization"], body: req.body, host: base.host,
+                 delivery: SnsMultipost::HttpTransport.delivery_request?(req) }
       FakeResp.new(*responses.shift)
     end
     [t, calls]
@@ -32,6 +33,7 @@ class BlueskyApiTest < Minitest::Test
     assert_equal "me.bsky.social", body["identifier"]
     assert_equal "pw", body["password"]
     assert_nil c[:auth] # createSession は無認証
+    refute c[:delivery]
   end
 
   def test_upload_blob_sends_bytes_with_auth_and_returns_blob
@@ -69,6 +71,7 @@ class BlueskyApiTest < Minitest::Test
     assert_equal "2026-07-20T00:00:00Z", rec["record"]["createdAt"]
     assert_equal "app.bsky.embed.images", rec["record"]["embed"]["$type"]
     assert_equal "bafyxxx", rec["record"]["embed"]["images"][0]["image"]["ref"]["$link"]
+    assert calls.last[:delivery]
   end
 
   def test_create_post_without_images_has_no_embed

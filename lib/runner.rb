@@ -1,5 +1,6 @@
 require_relative "job_queue"
 require_relative "poster/base"
+require_relative "delivery_error"
 
 module SnsMultipost
   class Runner
@@ -19,6 +20,7 @@ module SnsMultipost
           @queue.complete(job)
           [job, :ok, result]
         rescue StandardError => e
+          job.delivery_state = "unknown" if e.is_a?(DeliveryUnknownError)
           @queue.fail(job, "#{e.class}: #{e.message}")
           [job, :failed, e.message]
         end

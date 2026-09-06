@@ -36,4 +36,37 @@ class JobQueueTest < Minitest::Test
       assert_empty Dir[File.join(dir, "failed", "*.json")]
     end
   end
+
+  def test_confirmed_requeue_clears_unknown_delivery_state
+    Dir.mktmpdir do |dir|
+      q = SnsMultipost::JobQueue.new(dir)
+      q.enqueue(SnsMultipost::Job.new(
+        sns: "jotter", text: "t", delivery_state: "unknown"))
+      job = q.pending.first
+      q.fail(job, "confirmation failed")
+      failed = Dir[File.join(dir, "failed", "*.json")].first
+
+      q.requeue(failed, confirmed_not_delivered: true)
+
+      assert_nil q.pending.first.delivery_state
+    end
+  end
+
+  def test_resolve_as_posted_moves_unknown_job_to_done_without_queueing
+    Dir.mktmpdir do |dir|
+      queue = SnsMultipost::JobQueue.new(dir)
+      queue.enqueue(SnsMultipost::Job.new(
+        sns: "jotter", text: "t", delivery_state: "unknown"))
+      job = queue.pending.first
+      queue.fail(job, "confirmation failed")
+      failed = Dir[File.join(dir, "failed", "*.json")].first
+
+      destination = queue.resolve_as_posted(failed)
+
+      assert_equal File.join(dir, "done", File.basename(failed)), destination
+      assert_empty queue.pending
+      data = JSON.parse(File.read(destination))
+      assert_equal "confirmed_posted", data["delivery_state"]
+    end
+  end
 end

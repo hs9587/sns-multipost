@@ -23,17 +23,18 @@ module SnsMultipost
     end
 
     def create_text_post(text)
-      create_container(
+      create_container({
         "media_type" => "TEXT",
         "text" => text,
-        "auto_publish_text" => "true")
+        "auto_publish_text" => "true"
+      }, delivery: true)
     end
 
     def create_image_post(text:, image_url:)
-      container = create_container(
+      container = create_container({
         "media_type" => "IMAGE",
         "image_url" => image_url,
-        "text" => text)
+        "text" => text})
       publish_ready_container(container_id(container))
     end
 
@@ -43,26 +44,27 @@ module SnsMultipost
       raise "Threads carouselの画像は20枚までです" if urls.length > 20
 
       children = urls.map do |url|
-        child = create_container(
+        child = create_container({
           "media_type" => "IMAGE",
           "image_url" => url,
-          "is_carousel_item" => "true")
+          "is_carousel_item" => "true"})
         id = container_id(child)
         wait_until_ready(id)
         id
       end
-      carousel = create_container(
+      carousel = create_container({
         "media_type" => "CAROUSEL",
         "children" => children.join(","),
-        "text" => text)
+        "text" => text})
       publish_ready_container(container_id(carousel))
     end
 
     private
 
-    def create_container(params)
+    def create_container(params, delivery: false)
       req = Net::HTTP::Post.new("/me/threads")
       req.set_form_data(params)
+      HttpTransport.mark_delivery(req) if delivery
       request(req)
     end
 
@@ -70,6 +72,7 @@ module SnsMultipost
       wait_until_ready(id)
       req = Net::HTTP::Post.new("/me/threads_publish")
       req.set_form_data("creation_id" => id)
+      HttpTransport.mark_delivery(req)
       request(req)
     end
 

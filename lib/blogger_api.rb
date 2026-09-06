@@ -22,6 +22,7 @@ module SnsMultipost
       req = Net::HTTP::Post.new(path)
       req["Content-Type"] = "application/json"
       req.body = JSON.generate({ "kind" => "blogger#post", "title" => title, "content" => html })
+      HttpTransport.mark_delivery(req) unless is_draft
       request(req)
     end
 

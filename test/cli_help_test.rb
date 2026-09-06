@@ -232,6 +232,28 @@ class CliHelpTest < Minitest::Test
     assert_includes stderr, "Usage: ruby bin/retry"
   end
 
+  def test_retry_help_explains_unknown_delivery_resolution
+    stdout, _stderr, status = run_cli("retry", "--help")
+    assert status.success?
+    assert_includes stdout, "--confirm-not-posted"
+    assert_includes stdout, "--confirm-posted"
+    assert_includes stdout, "再投稿せずdone/へ移して解決"
+  end
+
+  def test_retry_stops_unknown_delivery_before_loading_config
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "unknown.json")
+      File.write(path, JSON.generate(
+        "sns" => "jotter", "delivery_state" => "unknown"))
+
+      _stdout, stderr, status = run_cli("retry", path)
+
+      assert_equal 2, status.exitstatus
+      assert_includes stderr, "投稿結果不明のため再試行を停止しました"
+      assert_includes stderr, "--confirm-not-posted"
+    end
+  end
+
   def test_browser_login_requires_service
     _stdout, stderr, status = run_cli("browser_login")
     assert_equal 2, status.exitstatus

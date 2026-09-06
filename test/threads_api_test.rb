@@ -13,7 +13,8 @@ class ThreadsApiTest < Minitest::Test
     calls = []
     transport = lambda do |req, base|
       calls << { method: req.method, path: req.path, auth: req["Authorization"],
-                 ctype: req["Content-Type"], body: req.body, host: base.host }
+                 ctype: req["Content-Type"], body: req.body, host: base.host,
+                 delivery: SnsMultipost::HttpTransport.delivery_request?(req) }
       FakeResp.new(*responses.shift)
     end
     [transport, calls]
@@ -33,6 +34,7 @@ class ThreadsApiTest < Minitest::Test
     assert_equal "TEXT", params["media_type"]
     assert_equal "こんにちは", params["text"]
     assert_equal "true", params["auto_publish_text"]
+    assert call[:delivery]
   end
 
   def test_create_single_image_waits_until_ready_and_publishes
@@ -57,6 +59,8 @@ class ThreadsApiTest < Minitest::Test
     publish_params = URI.decode_www_form(calls[3][:body]).to_h
     assert_equal "/me/threads_publish", calls[3][:path]
     assert_equal "container-1", publish_params["creation_id"]
+    refute calls[0][:delivery]
+    assert calls[3][:delivery]
     assert_equal [1], sleeps
   end
 
