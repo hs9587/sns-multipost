@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "task_runner"
+
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/task_run [options]",
+  description: "Windowsタスクスケジューラからwatchとrun_queueを順に実行し、結果をlogs/cron.logへ記録します。",
+  notes: ["通常は bin/task register がこのコマンドをタスクへ登録するため、手動実行は不要です。",
+          "watchが失敗しても既存キュー処理のためrun_queueを実行します。",
+          "どちらか一方でも失敗すると終了コード1を返し、最後の異常記録をstate/に保持します。",
+          "自動retryは行いません。"])
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+
+root = File.expand_path("..", __dir__)
+exit SnsMultipost::TaskRunner.new(root: root).run

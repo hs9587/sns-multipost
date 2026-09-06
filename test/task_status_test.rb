@@ -95,12 +95,31 @@ class TaskStatusTest < Minitest::Test
     end
   end
 
+  def test_register_runs_ruby_runner_with_selected_ruby
+    Dir.mktmpdir do |dir|
+      runner = File.join(dir, "task_run")
+      ruby = File.join(dir, "ruby.exe")
+      FileUtils.touch(runner)
+      FileUtils.touch(ruby)
+      calls = []
+      capture3 = lambda do |*args|
+        calls << args
+        ["", "", FakeStatus.new(true, 0)]
+      end
+
+      assert SnsMultipost::TaskStatus.register(
+        "sns-multipost", runner_path: runner, ruby_path: ruby,
+        minutes: 10, capture3: capture3)
+      assert_equal %Q{"#{ruby}" "#{runner}"}, calls[0][5]
+    end
+  end
+
   def test_register_rejects_missing_runner_and_invalid_interval
     error = assert_raises(RuntimeError) do
       SnsMultipost::TaskStatus.register(
         "sns-multipost", runner_path: "missing.bat", minutes: 10)
     end
-    assert_match(/バッチが見つかりません/, error.message)
+    assert_match(/実行ラッパーが見つかりません/, error.message)
 
     Dir.mktmpdir do |dir|
       runner = File.join(dir, "cron.bat")

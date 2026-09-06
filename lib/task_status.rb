@@ -1,5 +1,6 @@
 require "json"
 require "open3"
+require "rbconfig"
 require "time"
 
 module SnsMultipost
@@ -61,16 +62,26 @@ module SnsMultipost
       raise "Windowsタスク「#{task_name}」を変更できません: #{message}"
     end
 
-    def register(task_name, runner_path:, minutes:, capture3: Open3.method(:capture3))
+    def register(task_name, runner_path:, minutes:, ruby_path: nil,
+                 capture3: Open3.method(:capture3))
       runner = File.expand_path(runner_path)
-      raise "タスク用バッチが見つかりません: #{runner}" unless File.file?(runner)
+      raise "タスク用実行ラッパーが見つかりません: #{runner}" unless File.file?(runner)
 
       interval = Integer(minutes)
       raise "実行間隔は1～1440分で指定してください" unless interval.between?(1, 1440)
 
+      extension = File.extname(runner).downcase
+      task_command = if %w[.bat .cmd .exe].include?(extension)
+                       %Q{"#{runner}"}
+                     else
+                       ruby = File.expand_path(ruby_path || RbConfig.ruby)
+                       raise "Rubyが見つかりません: #{ruby}" unless File.file?(ruby)
+                       %Q{"#{ruby}" "#{runner}"}
+                     end
+
       _stdout, stderr, status = capture3.call(
         "schtasks.exe", "/Create", "/TN", task_name,
-        "/TR", %Q{"#{runner}"}, "/SC", "MINUTE", "/MO", interval.to_s, "/F")
+        "/TR", task_command, "/SC", "MINUTE", "/MO", interval.to_s, "/F")
       unless status.success?
         message = utf8(stderr).strip
         message = "終了コード#{status.exitstatus}" if message.empty?

@@ -3,19 +3,23 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "cli"
 require "job_history"
 require "task_status"
+require "task_runner"
+require "rbconfig"
 
 task_name = "sns-multipost"
-runner_path = File.expand_path("~/Documents/sns-multipost-cron.bat")
+runner_path = File.expand_path("task_run", __dir__)
+ruby_path = RbConfig.ruby
 minutes = 10
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/task [options] [ACTION]",
   description: "sns-multipost用Windowsタスクスケジューラの状態確認、登録、解除、有効化、一時停止を行います。\nPowerShell、コマンドプロンプト、Git Bashから同じように実行できます。",
   examples: ["ruby bin/task", "ruby bin/task disable", "ruby bin/task enable",
              "ruby bin/task register", "ruby bin/task unregister",
-             "ruby bin/task register --minutes 10 --runner C:\\path\\sns-multipost-cron.bat"],
+             "ruby bin/task register --minutes 10",
+             "ruby bin/task register --runner C:\\path\\custom-runner.bat"],
   notes: ["ACTIONを省略すると状態を読み取るだけです。",
           "ACTIONは register、unregister、enable、disable のいずれかです。",
-          "registerの既定は ~/Documents/sns-multipost-cron.bat を10分間隔で実行します。",
+          "registerの既定はリポジトリ内の bin/task_run を現在のRubyで10分間隔に実行します。",
           "registerは同名タスクを上書きして有効化し、バッテリ動作と多重起動防止を設定します。",
           "unregisterはタスク登録だけを解除し、バッチ、ログ、ジョブは削除しません。",
           "切替後も現在の状態、次回・前回実行時刻、前回結果を表示します。",
@@ -25,8 +29,11 @@ parser = SnsMultipost::Cli.parser(
   opts.on("--task NAME", "確認または変更するWindowsタスク名") do |value|
     task_name = value
   end
-  opts.on("--runner PATH", "registerで実行するバッチファイル") do |value|
+  opts.on("--runner PATH", "registerで実行するラッパー（既定: bin/task_run）") do |value|
     runner_path = value
+  end
+  opts.on("--ruby PATH", "bin/task_runを実行するruby.exe（既定: 現在のRuby）") do |value|
+    ruby_path = value
   end
   opts.on("--minutes N", Integer, "registerの実行間隔（1～1440分）") do |value|
     minutes = value
@@ -47,7 +54,7 @@ begin
   case action
   when "register"
     SnsMultipost::TaskStatus.register(
-      task_name, runner_path: runner_path, minutes: minutes)
+      task_name, runner_path: runner_path, ruby_path: ruby_path, minutes: minutes)
     puts "登録: #{task_name}（#{minutes}分間隔、#{File.expand_path(runner_path)}）"
   when "unregister"
     SnsMultipost::TaskStatus.unregister(task_name)
@@ -60,6 +67,7 @@ begin
   end
   puts SnsMultipost::TaskStatus.format(SnsMultipost::TaskStatus.query(task_name))
   root = File.expand_path("..", __dir__)
+  puts SnsMultipost::TaskRunner.format_status(SnsMultipost::TaskRunner.load_status(root))
   history = SnsMultipost::JobHistory.snapshot(
     done_directory: File.join(root, "done"), failed_directory: File.join(root, "failed"))
   puts SnsMultipost::JobHistory.format_summary(history)

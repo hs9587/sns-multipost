@@ -129,36 +129,19 @@ Chromeが標準の場所にない場合は `SNS_MULTIPOST_CHROME_PATH` 環境変
 Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常駐プロセスは持たず、
 タスクスケジューラで `bin/watch` -> `bin/run_queue` を数分おきに回す。
 
-### 1. 実行ラッパー（.bat）を用意
+### 1. 実行ラッパー
 
-リポジトリ外に次の内容で保存する（`<REPO>`・`<RUBY>` は実際の絶対パスに置き換え）。
-タスクスケジューラ実行時は PATH や cwd が対話シェルと異なることがあるため、
-**ruby もログも絶対パスで書く**（相対パスだと「タスクは動くがログも出ず exit 1」になりやすい）:
+リポジトリ内の `bin/task_run` が `watch` と `run_queue` を順に実行し、両方の終了コードを
+`logs/cron.log` に記録する。`watch` が失敗しても既存キューを処理するため `run_queue` は実行し、
+どちらか一方でも失敗した場合はタスクスケジューラへ終了コード1を返す。自動再投稿はしない。
 
-    @echo off
-    set "REPO=<REPO>"
-    set "RUBY=<RUBY>\ruby.exe"
-    set "LOG=%REPO%\logs\cron.log"
-    cd /d "%REPO%" || (echo [%date% %time%] cd FAILED errorlevel=%errorlevel%>>"%LOG%" ^& exit /b 9)
-    echo [%date% %time%] start cwd=%CD%>>"%LOG%"
-    "%RUBY%" "%REPO%\bin\watch"     >>"%LOG%" 2>&1
-    "%RUBY%" "%REPO%\bin\run_queue" >>"%LOG%" 2>&1
-    if errorlevel 1 goto run_queue_failed
-    echo [%date% %time%] end run_queue_exit=0>>"%LOG%"
-    exit /b 0
+最後の実行結果と最後に発生した異常は `state/task_run_status.json` に保存する。後続の正常な空実行で
+タスクスケジューラの「前回結果」が成功へ戻っても、最後の異常は `ruby bin/task` で確認できる。
+`failed/` とログを確認してから、必要なジョブだけ `bin/retry` で手動再実行する。
 
-    :run_queue_failed
-    echo [%date% %time%] WARNING: run_queue failed; review failed\ and the log before manual retry.>>"%LOG%"
-    echo [%date% %time%] end run_queue_exit=1>>"%LOG%"
-    exit /b 1
-
-`<RUBY>` は `(Get-Command ruby).Source` の入っているディレクトリ（例 `C:\Ruby33-x64\bin`）。
-`run_queue` は1件でも失敗すると終了コード1を返す。バッチは警告を記録して同じ終了コードを
-タスクスケジューラへ返すが、自動再投稿はしない。`failed\` とログを確認してから、必要な
-ジョブだけ `bin/retry` で手動再実行する。
-
-`ruby bin/task` は直近のタスク結果に加えて、`done/` の最新ジョブと同時刻以降に残る
-`failed/` のJSONジョブを最大3件表示する。詳しい一覧は `ruby bin/failed_jobs` で確認できる。
+`ruby bin/task` は直近のタスク結果、定期実行ラッパーの最終結果、最後に記録した異常に加えて、
+`done/` の最新ジョブと同時刻以降に残る `failed/` のJSONジョブを最大3件表示する。
+詳しい一覧は `ruby bin/failed_jobs` で確認できる。
 `--limit` で表示件数、`--offset` で過去方向の開始位置を変え、`--all` でdone最新より古い
 保留分も含める。いずれも参考表示だけで、異常判定や自動再投稿は行わない。
 
@@ -174,10 +157,13 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 
     ruby bin\task register
 
-既定では `~/Documents/sns-multipost-cron.bat` を10分おきに実行する。同名タスクがあれば
+既定では、登録を実行したRubyでリポジトリ内の `bin/task_run` を10分おきに実行する。同名タスクがあれば
 上書きして有効化し、バッテリ動作を許可、多重起動は抑止する。場所や間隔を変える場合:
 
-    ruby bin\task register --runner C:\path\sns-multipost-cron.bat --minutes 5
+    ruby bin\task register --minutes 5
+
+独自の `.bat` / `.cmd` を使う場合だけ `--runner` で明示できる。旧来の
+`~/Documents/sns-multipost-cron.bat` は、既定設定で再登録した後はタスクから使われない。
 
 ログオン中に動く。PC がスリープ中は動かないので常時起動の機で運用する。
 
@@ -189,7 +175,7 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 `schtasks` はネイティブ exe なので PowerShell / cmd どちらで打ってもよい（`/Create` と同じ場所でよい）。
 `Set-ScheduledTask`（PowerShell）と `schtasks` は同じタスクを触るので混在しても問題ない。
 
-- 動作ログ: `type logs\cron.log`（末尾に `ok=... failed=...`）
+- 動作ログ: `type logs\cron.log`（末尾に `watch_exit=... run_queue_exit=... overall_exit=...`）
 - 状態確認: `ruby bin\task`（PowerShell、コマンドプロンプト、Git Bash共通。次回・前回実行と結果を文字化けせず表示）
 - 一時停止 / 再開: `ruby bin\task disable` / `ruby bin\task enable`（3シェル共通。切替後の状態も表示）
 - 登録 / 解除: `ruby bin\task register` / `ruby bin\task unregister`（解除してもバッチ、ログ、ジョブは削除しない）
