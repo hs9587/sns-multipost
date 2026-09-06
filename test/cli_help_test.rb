@@ -40,6 +40,8 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "この後に ruby bin/run_queue"
     assert_includes stdout, "別のwatch、post、run_queue、retryが実行中"
     assert_includes stdout, "完成済み投稿先を重複させず同じ監視バッチを再開"
+    assert_includes stdout, "最新40件まで"
+    assert_includes stdout, "古い投稿は取り込みません"
   end
 
   def test_watch_rewind_rejects_invalid_or_conflicting_options_before_loading_config

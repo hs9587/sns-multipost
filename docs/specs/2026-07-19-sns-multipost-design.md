@@ -64,7 +64,7 @@ sns-multipost/
 
 ## 5. トリガ（2系統）
 
-- `bin/watch`: Fedibird API で自分の新着投稿を取得。最終処理済み status id を `state/` に記録して差分検出。新着1投稿につき投稿先SNS数ぶんのジョブを `queue/` に書く。画像はこの時点でダウンロードしてローカルパスをジョブに記録。タスクスケジューラで5分おき起動。
+- `bin/watch`: Fedibird API で自分の新着投稿を最新40件まで取得。最終処理済み status id を `state/` に記録して差分検出。新着1投稿につき投稿先SNS数ぶんのジョブを `queue/` に書く。画像はこの時点でダウンロードしてローカルパスをジョブに記録。全履歴同期は目的とせず、未取得が40件を超えた場合は古い投稿を取り込まない。
 - `bin/post`: `--image` でローカル画像対応先、`--from-fedibird-latest` で最新Fedibird投稿の公開画像URLを必要とするThreads / Bloggerへ、二段階で手動ジョブを作成できる。`--target` は複数指定可能。
 - `bin/post "本文..."`: 写真なし・指示だけの投稿（おはよう投稿の2way目）。この場合きっかけ投稿が存在しないため、**Fedibird を含む全SNS** のジョブを作る。
 
@@ -153,4 +153,4 @@ sns-multipost/
 - Blogger: 本文投稿はAPIのまま、画像は専用Chromeで内部画像ストアへ保存する混合方式を実装。APIで作る非公開の一時下書きは画像URL取得後に削除し、URLキャッシュと未削除下書き記録を `state/blogger_image_store.json` に保持する。統合後の実投稿確認待ち
 - Phase 3: mixi2・mixi・Jotter.meは実投稿まで完了。Threads単画像もFedibird最新画像経路で実投稿確認済み。Instagram / Facebookは自動投稿せず、Xも規約上ブラウザ自動化しない
 - 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせでき、`--rewind COUNT` でキューを作らず直近投稿を再検出対象へ戻せる
-- ハードニング候補: Fedibird 取得のページング、HTTP タイムアウト、重複投稿抑止、排他制御、done/failed/state/media の清掃
+- ハードニング候補: HTTPタイムアウト、重複投稿抑止、排他制御は実装済み。残件はdone/failed/state/mediaとChromeキャッシュの清掃方針
