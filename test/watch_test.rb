@@ -6,6 +6,20 @@ require "title_rules"
 require "self_posted"
 
 class WatchTest < Minitest::Test
+  class InterruptingQueue
+    def initialize(queue)
+      @queue = queue
+      @calls = 0
+    end
+
+    def enqueue(job, now:)
+      @calls += 1
+      raise "simulated interruption" if @calls == 2
+
+      @queue.enqueue(job, now: now)
+    end
+  end
+
   class FakeApi
     def initialize(statuses)
       @statuses = statuses
@@ -153,6 +167,72 @@ class WatchTest < Minitest::Test
       job = queue.pending.first
       assert_equal ["https://media.example/a.jpg", "https://media.example/b.jpg"],
                    job.media_urls
+    end
+  end
+
+  def test_resumes_interrupted_batch_without_duplicate_target_jobs
+    Dir.mktmpdir do |dir|
+      _watch, queue = build_watch(dir)
+      File.write(File.join(dir, "since_id.txt"), "2")
+      self_posted = SnsMultipost::SelfPosted.new(File.join(dir, "interrupted_sp.txt"))
+      self_posted.record("4")
+      interrupted = SnsMultipost::Watch.new(
+        config: SnsMultipost::Config.new(
+          { "targets" => { "watch" => %w[x bluesky] },
+            "fedibird" => { "account_id" => "42" } }),
+        api: FakeApi.new(STATUSES),
+        queue: InterruptingQueue.new(queue),
+        titles: SnsMultipost::TitleRules.load,
+        self_posted: self_posted,
+        state_path: File.join(dir, "since_id.txt"),
+        media_root: File.join(dir, "media"),
+        media_fetcher: ->(_u) { "" })
+
+      assert_raises(RuntimeError) { interrupted.run }
+      assert_equal "2", File.read(File.join(dir, "since_id.txt"))
+      assert File.exist?(File.join(dir, "watch_batch.json"))
+
+      resumed, = build_watch(dir)
+      resumed.run
+
+      jobs = queue.pending
+      assert_equal 2, jobs.length
+      assert_equal %w[bluesky x], jobs.map(&:sns).sort
+      assert_equal 2, jobs.map(&:dedupe_key).uniq.length
+      assert_equal "5", File.read(File.join(dir, "since_id.txt"))
+      refute File.exist?(File.join(dir, "watch_batch.json"))
+    end
+  end
+
+  def test_rewind_after_completed_batch_creates_a_new_delivery_batch
+    Dir.mktmpdir do |dir|
+      watch, queue = build_watch(dir)
+      File.write(File.join(dir, "since_id.txt"), "2")
+      watch.run
+      original_keys = queue.pending.map(&:dedupe_key)
+
+      watch.rewind(count: 1)
+      watch.run
+
+      assert_equal 4, queue.pending.length
+      assert_equal 4, queue.pending.map(&:dedupe_key).uniq.length
+      refute_empty original_keys
+    end
+  end
+
+  def test_removes_batch_left_after_state_was_already_advanced
+    Dir.mktmpdir do |dir|
+      state_path = File.join(dir, "since_id.txt")
+      batch_path = File.join(dir, "watch_batch.json")
+      File.write(state_path, "5")
+      File.write(batch_path, JSON.generate(
+        "id" => "old-batch", "from_since" => "2", "to_since" => "5"))
+      watch, queue = build_watch(dir, statuses: [])
+
+      assert_equal 0, watch.run
+
+      assert_empty queue.pending
+      refute File.exist?(batch_path)
     end
   end
 end

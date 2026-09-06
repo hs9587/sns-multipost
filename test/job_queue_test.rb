@@ -69,4 +69,22 @@ class JobQueueTest < Minitest::Test
       assert_equal "confirmed_posted", data["delivery_state"]
     end
   end
+
+  def test_enqueue_reuses_job_with_same_dedupe_key_after_completion
+    Dir.mktmpdir do |dir|
+      queue = SnsMultipost::JobQueue.new(dir)
+      first = SnsMultipost::Job.new(
+        sns: "bluesky", text: "t", dedupe_key: "batch:9:bluesky")
+      first_path = queue.enqueue(first, now: Time.new(2026, 9, 6, 10, 0, 0))
+      queue.complete(queue.pending.first)
+
+      second_path = queue.enqueue(SnsMultipost::Job.new(
+        sns: "bluesky", text: "t", dedupe_key: "batch:9:bluesky"),
+        now: Time.new(2026, 9, 6, 10, 1, 0))
+
+      assert_equal File.join(dir, "done", File.basename(first_path)), second_path
+      assert_empty queue.pending
+      assert_equal 1, Dir[File.join(dir, "done", "*.json")].length
+    end
+  end
 end

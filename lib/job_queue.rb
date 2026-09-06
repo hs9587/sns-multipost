@@ -1,12 +1,13 @@
 require "json"
 require "securerandom"
 require "fileutils"
+require "digest"
 require_relative "atomic_file"
 
 module SnsMultipost
   class Job
     ATTRS = %w[sns text title media_paths media_urls source_url attempts last_error
-               delivery_state created_at].freeze
+               delivery_state dedupe_key created_at].freeze
     attr_accessor(*ATTRS.map(&:to_sym))
     attr_reader :path
 
@@ -33,7 +34,12 @@ module SnsMultipost
     end
 
     def enqueue(job, now: Time.now)
-      name = "#{now.strftime('%Y%m%d-%H%M%S')}_#{job.sns}_#{SecureRandom.hex(2)}.json"
+      suffix = job.dedupe_key ? dedupe_suffix(job.dedupe_key) : SecureRandom.hex(2)
+      if job.dedupe_key
+        existing = find_deduplicated_job(suffix, job.dedupe_key)
+        return existing if existing
+      end
+      name = "#{now.strftime('%Y%m%d-%H%M%S')}_#{job.sns}_#{suffix}.json"
       path = File.join(@root, "queue", name)
       AtomicFile.write(path, JSON.pretty_generate(job.to_h))
       path
@@ -75,6 +81,23 @@ module SnsMultipost
     end
 
     private
+
+    def dedupe_suffix(key)
+      Digest::SHA256.hexdigest(key.to_s)[0, 12]
+    end
+
+    def find_deduplicated_job(suffix, key)
+      candidates = %w[queue done failed].flat_map do |directory|
+        Dir[File.join(@root, directory, "*_#{suffix}.json")]
+      end
+      candidates.each do |path|
+        stored = JSON.parse(File.read(path))
+        return path if stored["dedupe_key"] == key
+      end
+      return nil if candidates.empty?
+
+      raise "ジョブ識別子の衝突を検出しました: #{suffix}"
+    end
 
     def move(src, dir)
       dest = File.join(@root, dir, File.basename(src))
