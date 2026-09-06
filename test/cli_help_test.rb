@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login dryrun_titles failed_jobs jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task task_run threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login cleanup dryrun_titles failed_jobs jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task task_run threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -111,6 +111,19 @@ class CliHelpTest < Minitest::Test
       assert_equal 2, status.exitstatus
       assert_includes stderr, "Usage: ruby bin/failed_jobs"
     end
+  end
+
+  def test_cleanup_help_and_dry_run_requirement
+    stdout, _stderr, status = run_cli("cleanup", "--help")
+    assert status.success?
+    assert_includes stdout, "--dry-run"
+    assert_includes stdout, "--days N"
+    assert_includes stdout, "IndexedDBは保護"
+    assert_includes stdout, "ファイルを削除しません"
+
+    _stdout, stderr, status = run_cli("cleanup")
+    assert_equal 2, status.exitstatus
+    assert_includes stderr, "--dry-runだけを提供"
   end
 
   def test_dryrun_titles_help_explains_dictionary_check_without_posting

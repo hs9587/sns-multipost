@@ -174,6 +174,15 @@ Blogger編集画面の「パソコンからアップロード」を自動操作�
 参照されなくなった画像、失敗スクリーンショット、Chromeキャッシュの順にローテーションを検討する。
 失敗ジョブ本体は、再実行や原因調査が済むまで自動削除しない。
 
+削除候補は、現在は読取り専用の次のコマンドで確認する。既定では30日以上経過した完了ジョブ、
+未処理ジョブから参照されない画像、対応JSONのない失敗スクリーンショットと、再生成可能な
+Chromeキャッシュを分類する。JotterのIndexedDBを含むログイン・ウォレット関連状態は保護する。
+
+    ruby bin/cleanup --dry-run
+
+表示対象の日数と各分類の表示件数は `--days N`、`--limit N` で変更できる。このコマンドには
+削除機能がなく、実際のローテーション規則は候補を確認してから決める。
+
 設計の原点は [docs/specs/2026-07-19-sns-multipost-design.md](docs/specs/2026-07-19-sns-multipost-design.md)、
 API投稿先の実装記録は [docs/specs/2026-07-20-sns-multipost-phase2-design.md](docs/specs/2026-07-20-sns-multipost-phase2-design.md)、
 Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-threads-api.md)、
@@ -182,4 +191,5 @@ Jotter画像とDEN運用は [docs/specs/2026-08-15-jotter-image-den.md](docs/spe
 API通信の安全な再試行は [docs/specs/2026-09-06-http-reliability.md](docs/specs/2026-09-06-http-reliability.md)、
 投稿結果不明時の重複防止は [docs/specs/2026-09-06-delivery-unknown.md](docs/specs/2026-09-06-delivery-unknown.md)、
 監視・キュー書込みの安全化は [docs/specs/2026-09-06-queue-write-safety.md](docs/specs/2026-09-06-queue-write-safety.md)、
+清掃候補の安全な確認は [docs/specs/2026-09-06-cleanup-dry-run.md](docs/specs/2026-09-06-cleanup-dry-run.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

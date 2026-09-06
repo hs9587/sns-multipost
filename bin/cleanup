@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "cleanup"
+
+dry_run = false
+days = 30
+limit = 10
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/cleanup --dry-run [options]",
+  description: "sns-multipostの古い完了ジョブ、未参照画像、孤立した失敗スクリーンショット、再生成可能なChromeキャッシュを調べます。\n現在は候補表示専用で、ファイルを削除しません。",
+  examples: ["ruby bin/cleanup --dry-run",
+             "ruby bin/cleanup --dry-run --days 14 --limit 20"],
+  notes: ["queue/とfailed/が参照する画像、およびfailed/のJSONは候補にしません。",
+          "ChromeのCookie、Local Storage、IndexedDB、Service Worker、ログイン情報は候補にしません。",
+          "JotterのBrowser ID・DEN・暗号化データに関わり得るIndexedDBは保護します。",
+          "Chromeキャッシュ候補に経過日数は適用しません。将来削除する場合は専用Chromeをすべて閉じます。",
+          "--limitは各分類の表示件数だけを変え、候補の集計件数には影響しません。"]
+) do |opts|
+  opts.on("--dry-run", "削除せず候補だけを表示（現在は必須）") { dry_run = true }
+  opts.on("--days N", Integer, "N日以上経過したファイルを候補にする（既定: 30）") do |value|
+    days = value
+  end
+  opts.on("--limit N", Integer, "各分類を最大N件表示（既定: 10）") do |value|
+    limit = value
+  end
+end
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.reject_arguments!(parser)
+unless dry_run
+  SnsMultipost::Cli.usage_error(parser, "現在は安全確認のため--dry-runだけを提供しています")
+end
+unless days.between?(1, 3650)
+  SnsMultipost::Cli.usage_error(parser, "--daysは1以上3650以下にしてください")
+end
+unless limit.between?(1, 100)
+  SnsMultipost::Cli.usage_error(parser, "--limitは1以上100以下にしてください")
+end
+
+report = SnsMultipost::Cleanup.new.scan(days: days)
+puts SnsMultipost::Cleanup.format(report, limit: limit)

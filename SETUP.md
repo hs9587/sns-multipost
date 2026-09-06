@@ -188,6 +188,7 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 
 - 動作ログ: `type logs\cron.log`（末尾に `watch_exit=... run_queue_exit=... overall_exit=...`）
 - 状態確認: `ruby bin\task`（PowerShell、コマンドプロンプト、Git Bash共通。次回・前回実行と結果を文字化けせず表示）
+- 容量・清掃候補確認: `ruby bin\cleanup --dry-run`（削除は行わず、保護対象と候補を分類）
 - 一時停止 / 再開: `ruby bin\task disable` / `ruby bin\task enable`（3シェル共通。切替後の状態も表示）
 - 登録 / 解除: `ruby bin\task register` / `ruby bin\task unregister`（解除してもバッチ、ログ、ジョブは削除しない）
 - このタスクの確認: `schtasks /Query /TN "sns-multipost" /V /FO LIST`
