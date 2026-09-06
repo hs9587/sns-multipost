@@ -7,6 +7,7 @@ require "title_rules"
 require "self_posted"
 require "fedibird_api"
 require "watch"
+require "run_lock"
 
 sync_only = false
 rewind_count = nil
@@ -17,6 +18,7 @@ parser = SnsMultipost::Cli.parser(
              "ruby bin/watch --rewind 1"],
   notes: ["このコマンドだけでは各SNSへの投稿は実行しません。",
           "通常実行はdry_runに関係なくジョブを作成します。",
+          "別のwatch、post、run_queue、retryが実行中なら、キューと監視基準を守るため処理せず終了します。",
           "--sync-onlyはキューを作らず、監視基準だけ最新へ進めます。",
           "--rewindはキューを作らず監視基準だけ戻し、次の通常実行で直近投稿を再検出させます。",
           "巻き戻し後の通常実行にも、返信・自己投稿を除外する規則が適用されます。"]) do |opts|
@@ -47,14 +49,19 @@ watch = SnsMultipost::Watch.new(
   self_posted: SnsMultipost::SelfPosted.new,
   state_path: File.expand_path("../state/since_id.txt", __dir__),
   media_root: File.expand_path("../state/media", __dir__))
-if rewind_count
-  result = watch.rewind(count: rewind_count)
-  puts "rewind: #{result[:from]} -> #{result[:to]}（#{result[:count]}件を再検出対象にしました。キューは作りません）"
-  puts "次: ruby bin/watch"
-elsif sync_only
-  watch.run(enqueue: false)
-  puts "sync-only: 基準を最新に合わせました（キューは作りません）"
-else
-  count = watch.run
-  puts "new statuses: #{count}"
+acquired = SnsMultipost::RunLock.new.synchronize do
+  if rewind_count
+    result = watch.rewind(count: rewind_count)
+    puts "rewind: #{result[:from]} -> #{result[:to]}（#{result[:count]}件を再検出対象にしました。キューは作りません）"
+    puts "次: ruby bin/watch"
+  elsif sync_only
+    watch.run(enqueue: false)
+    puts "sync-only: 基準を最新に合わせました（キューは作りません）"
+  else
+    count = watch.run
+    puts "new statuses: #{count}"
+  end
+end
+unless acquired
+  puts "skip: another watch, post, run_queue or retry is active"
 end

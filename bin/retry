@@ -15,7 +15,7 @@ parser = SnsMultipost::Cli.parser(
   description: "sns-multipostで失敗したfailed/のジョブをqueue/へ戻し、そのジョブだけ再実行します。\n通常はbin/run_queueの結果がfailedになった後、原因を直してから使用します。",
   examples: ["ruby bin/retry failed/20260805-120000_bluesky_ab12.json"],
   notes: ["dry_run: false の場合は実投稿します。",
-          "別のrun_queueまたはretryが実行中なら、二重投稿を避けるため処理せず終了します。",
+          "別のwatch、post、run_queue、retryが実行中なら、二重投稿とキュー競合を避けるため処理せず終了します。",
           "delivery_state=unknownのジョブは、投稿先で未投稿を確認して--confirm-not-postedを付けるまで再投稿しません。",
           "投稿済みだったunknownジョブは--confirm-postedで再投稿せずdone/へ移して解決します。",
           "--confirm-not-postedは今回指定したすべてのunknownジョブに適用します。",
@@ -65,7 +65,7 @@ if confirm_posted
     end
   end
   unless acquired
-    puts "skip: another run_queue or retry is active"
+    puts "skip: another watch, post, run_queue or retry is active"
   end
   exit 0
 end
@@ -86,7 +86,7 @@ acquired = SnsMultipost::RunLock.new.synchronize do
   end
 end
 unless acquired
-  puts "skip: another run_queue or retry is active"
+  puts "skip: another watch, post, run_queue or retry is active"
   exit 0
 end
 exit SnsMultipost::Runner.exit_status(results)

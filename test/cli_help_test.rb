@@ -38,6 +38,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "キューを作らず監視基準だけ最新へ進める"
     assert_includes stdout, "次の通常実行で直近投稿を再検出"
     assert_includes stdout, "この後に ruby bin/run_queue"
+    assert_includes stdout, "別のwatch、post、run_queue、retryが実行中"
   end
 
   def test_watch_rewind_rejects_invalid_or_conflicting_options_before_loading_config
@@ -212,6 +213,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "ruby bin/browser_login blogger"
     assert_includes stdout, "TEXTを省略した場合、本文は「おはようございます」になります。"
     assert_includes stdout, "ruby bin/post"
+    assert_includes stdout, "別のwatch、post、run_queue、retryが実行中"
   end
 
   def test_post_latest_fedibird_rejects_text_and_local_image_before_loading_config

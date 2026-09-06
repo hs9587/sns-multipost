@@ -1,6 +1,7 @@
 require "json"
 require "securerandom"
 require "fileutils"
+require_relative "atomic_file"
 
 module SnsMultipost
   class Job
@@ -34,7 +35,7 @@ module SnsMultipost
     def enqueue(job, now: Time.now)
       name = "#{now.strftime('%Y%m%d-%H%M%S')}_#{job.sns}_#{SecureRandom.hex(2)}.json"
       path = File.join(@root, "queue", name)
-      File.write(path, JSON.pretty_generate(job.to_h))
+      AtomicFile.write(path, JSON.pretty_generate(job.to_h))
       path
     end
 
@@ -51,7 +52,7 @@ module SnsMultipost
     def fail(job, error)
       job.attempts += 1
       job.last_error = error.to_s
-      File.write(job.path, JSON.pretty_generate(job.to_h))
+      AtomicFile.write(job.path, JSON.pretty_generate(job.to_h))
       move(job.path, "failed")
     end
 
@@ -59,7 +60,7 @@ module SnsMultipost
       if confirmed_not_delivered
         data = JSON.parse(File.read(path))
         data["delivery_state"] = nil
-        File.write(path, JSON.pretty_generate(data))
+        AtomicFile.write(path, JSON.pretty_generate(data))
       end
       dest = File.join(@root, "queue", File.basename(path))
       FileUtils.mv(path, dest)
@@ -69,7 +70,7 @@ module SnsMultipost
     def resolve_as_posted(path)
       data = JSON.parse(File.read(path))
       data["delivery_state"] = "confirmed_posted"
-      File.write(path, JSON.pretty_generate(data))
+      AtomicFile.write(path, JSON.pretty_generate(data))
       move(path, "done")
     end
 

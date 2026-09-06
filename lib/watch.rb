@@ -3,6 +3,7 @@ require "fileutils"
 require_relative "job_queue"
 require_relative "media"
 require_relative "html_text"
+require_relative "atomic_file"
 
 module SnsMultipost
   class Watch
@@ -63,7 +64,7 @@ module SnsMultipost
       rewound = older[count - 1]["id"].to_s
       raise "巻き戻し先の投稿IDを取得できないため、監視基準は変更しません" if rewound.empty?
 
-      File.write(@state_path, rewound)
+      AtomicFile.write(@state_path, rewound)
       { from: current, to: rewound, count: count }
     rescue ArgumentError, TypeError
       raise "巻き戻し件数は1以上40以下にしてください"
@@ -74,8 +75,7 @@ module SnsMultipost
     def record_state(statuses)
       newest = statuses.first
       return unless newest
-      FileUtils.mkdir_p(File.dirname(@state_path))
-      File.write(@state_path, newest["id"].to_s)
+      AtomicFile.write(@state_path, newest["id"].to_s)
     end
 
     def enqueue_status(st, now:)

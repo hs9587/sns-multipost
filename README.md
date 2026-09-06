@@ -31,6 +31,7 @@
 - `bin/task` は最後に記録した定期実行異常とdone最新時刻以降のfailedを表示し、`bin/failed_jobs` では古い保留分を含む履歴をページ指定して確認できる
 - API通信は接続・読取り・書込みの時間上限を共通化し、安全に未送信と判断できる接続失敗と冪等な取得処理だけを自動再試行する
 - API応答待ち切れやブラウザ送信後の確認失敗は「投稿結果不明」として再試行を止め、投稿先の確認後に明示的に再試行または投稿済み解決を選べる
+- `watch` / `post` / `run_queue` / `retry` は共通ロックで直列化し、ジョブJSONと監視基準は一時ファイルから原子的に確定する
 - mixi / mixi2 / Jotter.meは、画面要素の再取得、画像処理待ち、ログイン中アカウントと投稿個別画面の確認を強化済み
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
 - XはOAuth 1.0a認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
@@ -147,7 +148,7 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 
 ## ロードマップ
 
-1. ページング、監視・キュー書込み側への排他制御拡張、古いジョブ・画像の清掃など、安全性と安定性を高める
+1. Fedibird取得のページング、監視途中中断後の投稿先単位の重複抑止、古いジョブ・画像の清掃など、安全性と安定性を高める
 2. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
 
 従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
@@ -180,4 +181,5 @@ Threads APIは [docs/specs/2026-08-06-threads-api.md](docs/specs/2026-08-06-thre
 Jotter画像とDEN運用は [docs/specs/2026-08-15-jotter-image-den.md](docs/specs/2026-08-15-jotter-image-den.md)、
 API通信の安全な再試行は [docs/specs/2026-09-06-http-reliability.md](docs/specs/2026-09-06-http-reliability.md)、
 投稿結果不明時の重複防止は [docs/specs/2026-09-06-delivery-unknown.md](docs/specs/2026-09-06-delivery-unknown.md)、
+監視・キュー書込みの安全化は [docs/specs/2026-09-06-queue-write-safety.md](docs/specs/2026-09-06-queue-write-safety.md)、
 トークン取得と常駐運用は [SETUP.md](SETUP.md) を参照。

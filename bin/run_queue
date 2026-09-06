@@ -13,7 +13,7 @@ parser = SnsMultipost::Cli.parser(
   notes: ["bin/postで手動作成したジョブも処理します。",
           "Bloggerは本文をAPI投稿しますが、画像付きジョブだけは専用Chromeで内部画像ストアへ保存してからAPI投稿します。",
           "Blogger画像には事前の browser_login blogger と、Chromeを操作できるログオン中の実行環境が必要です。",
-          "別のrun_queueまたはretryが実行中なら、二重投稿を避けるため処理せず終了します。",
+          "別のwatch、post、run_queue、retryが実行中なら、二重投稿とキュー競合を避けるため処理せず終了します。",
           "API通信は時間上限を設け、冪等な取得と未送信の接続失敗だけを自動再試行します。結果不明の投稿POSTは二重投稿防止のため再送しません。",
           "1件でも投稿に失敗した場合は終了コード1、全件成功または処理対象なしの場合は0を返します。",
           "dry_run: false の場合は実投稿します。",
@@ -31,7 +31,7 @@ acquired = SnsMultipost::RunLock.new.synchronize do
   end
 end
 unless acquired
-  puts "skip: another run_queue or retry is active"
+  puts "skip: another watch, post, run_queue or retry is active"
   exit 0
 end
 ok_count = results.count { |result| result[1] == :ok }
