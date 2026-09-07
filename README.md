@@ -151,8 +151,8 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 
 ## ロードマップ
 
-1. `cleanup --apply` の初回運用で、古いジョブ・画像・再生成可能なChromeキャッシュの清掃結果を確認する
-2. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
+1. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する
+2. `cleanup --dry-run` の増加傾向を見ながら、30日の保持期間が適切か運用で確認する
 
 従来のBlogger公開記事では画像URLが公開後も `s3.fedibird.com` のままで、Blogger側へ自動複製
 されなかった。このため、現在はBlogger API投稿の前に専用Chromeで内部画像ストアへ保存する。
