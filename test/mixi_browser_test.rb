@@ -28,17 +28,24 @@ class MixiBrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :url, :text, :media_path, :screenshot_call, :match_text
+    attr_reader :url, :text, :media_path, :screenshot_call, :match_text, :home_visits
 
     def initialize(post_url: true, stale_actions: [])
       @post_url = post_url
       @stale_actions = stale_actions.dup
       @photo_open = false
       @posted = false
+      @home_visits = 0
     end
 
     def goto(url)
       @url = url
+      return unless url == SnsMultipost::MixiBrowser::HOME_URL
+
+      @home_visits += 1
+      @photo_open = false
+      @text = nil
+      @media_path = nil
     end
 
     def evaluate(script, *_args)
@@ -146,6 +153,20 @@ class MixiBrowserTest < Minitest::Test
         text: "再取得テスト", media_paths: ["one.png"])
 
     assert_equal "再取得テスト", browser.text
+    assert_equal "one.png", browser.media_path
+    assert result[:posted]
+  end
+
+  def test_post_rebuilds_entire_composer_after_media_input_stays_stale
+    browser = FakeBrowser.new(
+      stale_actions: Array.new(SnsMultipost::MixiBrowser::NODE_ACTION_ATTEMPTS, :media))
+
+    result = SnsMultipost::MixiBrowser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+        text: "フォーム再構築テスト", media_paths: ["one.png"])
+
+    assert_equal 2, browser.home_visits
+    assert_equal "フォーム再構築テスト", browser.text
     assert_equal "one.png", browser.media_path
     assert result[:posted]
   end

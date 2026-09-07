@@ -10,6 +10,7 @@ module SnsMultipost
     PHOTO_LINK_XPATH = "//a[@title='写真を追加']".freeze
     PHOTO_INPUT_SELECTOR = "input[type='file'][name='photo']".freeze
     NODE_ACTION_ATTEMPTS = 8
+    COMPOSER_REBUILD_ATTEMPTS = 3
     PHOTO_INPUT_SETTLE_SECONDS = 1
     NODE_ACTION_RETRY_SECONDS = 1
 
@@ -115,21 +116,11 @@ module SnsMultipost
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
       submission_started = false
-      open_home
-      entered = wait_for { browser.evaluate(SET_TEXT_JS, text) }
-      raise "mixiのつぶやき本文を入力できません" unless entered
-
-      unless media_paths.empty?
-        open_photo_input
-        @sleeper.call(PHOTO_INPUT_SETTLE_SECONDS)
-        with_fresh_node(-> { browser.at_css(PHOTO_INPUT_SELECTOR) }, "mixiの写真入力が見つかりません") do |media|
-          media.select_file(media_paths.first)
-        end
-        attached = wait_for do
-          state = browser.evaluate(FILE_STATE_JS)
-          state if state["files"] == 1
-        end
-        raise "mixiの画像選択を確認できません: #{media_paths.first}" unless attached
+      if media_paths.empty?
+        open_home
+        enter_text(text)
+      else
+        prepare_media_composer(text, media_paths.first)
       end
 
       expected = normalize_match_text(text)[0, 40]
@@ -185,6 +176,40 @@ module SnsMultipost
     def open_photo_input
       opened = wait_for { browser.evaluate(OPEN_PHOTO_INPUT_JS) }
       raise "mixiの写真追加ボタンが見つかりません" unless opened
+    end
+
+    def enter_text(text)
+      entered = wait_for { browser.evaluate(SET_TEXT_JS, text) }
+      raise "mixiのつぶやき本文を入力できません" unless entered
+    end
+
+    def prepare_media_composer(text, media_path)
+      last_error = nil
+      COMPOSER_REBUILD_ATTEMPTS.times do
+        open_home
+        enter_text(text)
+        open_photo_input
+        @sleeper.call(PHOTO_INPUT_SETTLE_SECONDS)
+        begin
+          with_fresh_node(
+            -> { browser.at_css(PHOTO_INPUT_SELECTOR) },
+            "mixiの写真入力が見つかりません"
+          ) { |media| media.select_file(media_path) }
+        rescue StandardError => e
+          raise unless node_not_found_error?(e)
+
+          last_error = e
+          next
+        end
+
+        attached = wait_for do
+          state = browser.evaluate(FILE_STATE_JS)
+          state if state["files"] == 1
+        end
+        raise "mixiの画像選択を確認できません: #{media_path}" unless attached
+        return true
+      end
+      raise last_error
     end
 
     def with_fresh_node(finder, missing_message)
