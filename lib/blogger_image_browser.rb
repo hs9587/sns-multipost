@@ -6,6 +6,14 @@ module SnsMultipost
     EDIT_URL = "https://www.blogger.com/blog/post/edit".freeze
     IMAGE_BUTTON_SELECTOR = '[aria-label="画像を挿入"]'.freeze
     UPLOAD_OPTION_XPATH = "//*[@aria-label='パソコンからアップロード' and @role='menuitem']".freeze
+    PICKER_INSERT_XPATH = <<~'XPATH'.strip.freeze
+      //*[self::button or @role='button'][
+        normalize-space(.)='選択' or normalize-space(.)='挿入' or
+        normalize-space(.)='Select' or normalize-space(.)='Insert' or
+        @aria-label='選択' or @aria-label='挿入' or
+        @aria-label='Select' or @aria-label='Insert'
+      ]
+    XPATH
 
     IMAGE_URLS_JS = <<~'JS'.freeze
       Array.from(document.images)
@@ -70,8 +78,19 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       input.select_file(path)
 
+      insert_requested = false
       added = wait_for(timeout: 60) do
-        (image_urls - known).first
+        url = (image_urls - known).first
+        next url if url
+
+        unless insert_requested
+          insert = picker_insert_button(picker)
+          if insert
+            insert.evaluate("this.click()")
+            insert_requested = true
+          end
+        end
+        nil
       end
       raise "Blogger本文への画像挿入を確認できません: #{path}" unless added
       added
@@ -92,12 +111,26 @@ module SnsMultipost
     end
 
     def image_urls
-      browser.frames.flat_map do |frame|
+      browser.frames.reject { |frame| frame.url.to_s.start_with?("https://docs.google.com/") }
+             .flat_map do |frame|
         next [] unless frame.execution_id
         frame.evaluate(IMAGE_URLS_JS)
       rescue Ferrum::Error
         []
       end.uniq
+    end
+
+    def picker_insert_button(picker)
+      picker.xpath(PICKER_INSERT_XPATH).find do |node|
+        node.evaluate(<<~'JS')
+          this.getClientRects().length > 0 && !this.disabled &&
+            this.getAttribute('aria-disabled') !== 'true'
+        JS
+      rescue Ferrum::Error
+        false
+      end
+    rescue Ferrum::Error
+      nil
     end
 
     def picker_frame

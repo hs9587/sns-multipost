@@ -28,16 +28,19 @@ class BloggerImageBrowserTest < Minitest::Test
   end
 
   class FakeFrame
-    attr_reader :execution_id
+    attr_reader :execution_id, :url
 
-    def initialize(urls: nil, input: nil)
+    def initialize(url:, urls: nil, input: nil, insert: nil)
       @execution_id = 1
+      @url = url
       @urls = urls
       @input = input
+      @insert = insert
     end
 
     def evaluate(_script) = @urls || []
     def at_css(selector) = selector == 'input[type="file"]' ? @input : nil
+    def xpath(selector) = selector == SnsMultipost::BloggerImageBrowser::PICKER_INSERT_XPATH ? [@insert].compact : []
   end
 
   class FakePage
@@ -50,7 +53,7 @@ class BloggerImageBrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :goto_url, :selected, :quit_called, :upload_option
+    attr_reader :goto_url, :selected, :quit_called, :upload_option, :insert_button
 
     def initialize
       @urls = []
@@ -59,10 +62,14 @@ class BloggerImageBrowserTest < Minitest::Test
       @upload_option = FakeNode.new(on_evaluate: ->(_script) { @picker_open = true })
       @input = FakeNode.new(on_select_file: lambda do |path|
         @selected = path
-        @urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
       end)
-      @editor = FakeFrame.new(urls: @urls)
-      @picker = FakeFrame.new(input: @input)
+      @insert_button = FakeNode.new(on_evaluate: lambda do |_script|
+        @urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
+        @picker_open = false
+      end)
+      @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @urls)
+      @picker = FakeFrame.new(
+        url: "https://docs.google.com/picker", input: @input, insert: @insert_button)
     end
 
     def goto(url) = (@goto_url = url)
@@ -89,6 +96,7 @@ class BloggerImageBrowserTest < Minitest::Test
     assert_equal "photo.png", browser.selected
     assert_includes browser.upload_option.evaluations, "this.click()"
     assert_equal 0, browser.upload_option.clicks
+    assert_includes browser.insert_button.evaluations, "this.click()"
     assert_equal [expected], result
     assert_equal [["photo.png", expected]], yielded
     assert_nil browser.quit_called
