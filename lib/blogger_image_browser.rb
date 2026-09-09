@@ -86,7 +86,14 @@ module SnsMultipost
         unless insert_requested
           insert = picker_insert_button(picker)
           if insert
-            insert.evaluate("this.click()")
+            begin
+              insert.evaluate("this.click()")
+            rescue StandardError => e
+              # クリックでGoogle画像追加フレームが閉じると、CDPの応答より先に
+              # execution contextが破棄されることがある。クリック後の正常な遷移
+              # として本文側の画像出現を待つ。
+              raise unless no_execution_context_error?(e)
+            end
             insert_requested = true
           end
         end
@@ -131,6 +138,10 @@ module SnsMultipost
       end
     rescue Ferrum::Error
       nil
+    end
+
+    def no_execution_context_error?(error)
+      error.class.name.end_with?("NoExecutionContextError")
     end
 
     def picker_frame

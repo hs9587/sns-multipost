@@ -2,6 +2,8 @@ require_relative "test_helper"
 require "blogger_image_browser"
 
 class BloggerImageBrowserTest < Minitest::Test
+  class TransientNoExecutionContextError < StandardError; end
+
   class FakeNode
     attr_reader :evaluations, :clicks
 
@@ -55,7 +57,7 @@ class BloggerImageBrowserTest < Minitest::Test
   class FakeBrowser
     attr_reader :goto_url, :selected, :quit_called, :upload_option, :insert_button
 
-    def initialize
+    def initialize(context_lost_on_insert: false)
       @urls = []
       @image_button = FakeNode.new
       @picker_open = false
@@ -63,9 +65,12 @@ class BloggerImageBrowserTest < Minitest::Test
       @input = FakeNode.new(on_select_file: lambda do |path|
         @selected = path
       end)
-      @insert_button = FakeNode.new(on_evaluate: lambda do |_script|
+      @insert_button = FakeNode.new(on_evaluate: lambda do |script|
+        next unless script == "this.click()"
+
         @urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
         @picker_open = false
+        raise TransientNoExecutionContextError, "frame closed" if context_lost_on_insert
       end)
       @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @urls)
       @picker = FakeFrame.new(
@@ -108,5 +113,16 @@ class BloggerImageBrowserTest < Minitest::Test
     assert_equal "https://blogger.googleusercontent.com/x/s0/a.png",
                  SnsMultipost::BloggerImageBrowser.original_url(
                    "https://blogger.googleusercontent.com/x/s640/a.png")
+  end
+
+  def test_upload_waits_for_editor_image_when_picker_context_closes_on_insert
+    browser = FakeBrowser.new(context_lost_on_insert: true)
+
+    result = SnsMultipost::BloggerImageBrowser.new(
+      blog_id: "42", browser: browser, timeout: 0,
+      sleeper: ->(_seconds) {}).upload(
+        draft_id: "99", media_paths: ["photo.png"])
+
+    assert_equal ["https://blogger.googleusercontent.com/img/example/s0/photo.png"], result
   end
 end
