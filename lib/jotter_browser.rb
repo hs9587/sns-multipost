@@ -3,6 +3,7 @@ require_relative "delivery_error"
 require "digest"
 require "net/http"
 require "socket"
+require "time"
 require "uri"
 require_relative "browser_profile"
 
@@ -24,7 +25,8 @@ module SnsMultipost
       (() => ({
         loggedIn: !location.pathname.includes('/welcome') &&
           !!document.querySelector('a[href="/ja-JP/wallet/"]') &&
-          !!document.querySelector('input[type="image"].user-face')
+          !!document.querySelector('input[type="image"].user-face'),
+        home: location.pathname === '/ja-JP/' && !location.hash
       }))()
     JS
 
@@ -98,8 +100,12 @@ module SnsMultipost
     JS
 
     POST_URLS_JS = <<~'JS'.freeze
-      (() => Array.from(document.querySelectorAll('a[href*="/ja-JP/jot/#"]'))
-        .map((link) => new URL(link.getAttribute('href'), location.origin).href))()
+      (() => {
+        const urls = Array.from(document.querySelectorAll('a[href*="/ja-JP/jot/#"]'))
+          .map((link) => new URL(link.getAttribute('href'), location.origin).href);
+        if (location.pathname.includes('/jot/') && location.hash) urls.push(location.href);
+        return Array.from(new Set(urls));
+      })()
     JS
 
     POST_URL_JS = <<~'JS'.freeze
@@ -132,10 +138,25 @@ module SnsMultipost
       (() => {
         const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
         const expected = normalize(arguments[0]);
+        const notBefore = Date.parse(arguments[1] || '');
+        const bodyText = document.body?.innerText || '';
         const individual = location.pathname.includes('/jot/') ||
           location.pathname.includes('/doc/') || !!location.hash;
+        const timestamps = Array.from(document.querySelectorAll('time[datetime]'))
+          .map((node) => Date.parse(node.getAttribute('datetime')))
+          .filter(Number.isFinite);
+        for (const match of bodyText.matchAll(
+          /(\d{4})年(\d{1,2})月(\d{1,2})日(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/g
+        )) {
+          timestamps.push(new Date(
+            Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+            Number(match[4]), Number(match[5]), Number(match[6] || 0)
+          ).getTime());
+        }
+        const recent = Number.isFinite(notBefore) &&
+          timestamps.some((timestamp) => timestamp >= notBefore);
         return individual &&
-          normalize(document.body?.innerText).includes(expected);
+          normalize(bodyText).includes(expected) && recent;
       })()
     JS
 
@@ -400,6 +421,7 @@ module SnsMultipost
 
       submit = wait_for { safe_at_css(SUBMIT_SELECTOR) }
       raise "JotterのPostボタンが見つかりません" unless submit
+      verification_not_before = (Time.now - 10 * 60).iso8601
       submission_started = true
       submit.click
 
@@ -413,7 +435,7 @@ module SnsMultipost
       browser.goto(url) unless safe_evaluate(AT_POST_URL_JS, url)
       detail = wait_for(timeout: @confirmation_timeout) do
         click_post_confirmations
-        safe_evaluate(POST_DETAIL_JS, expected)
+        safe_evaluate(POST_DETAIL_JS, expected, verification_not_before)
       end
       raise "Jotterの新しい公開投稿の個別画面を確認できません" unless detail
       { posted: true, url: url }
@@ -650,7 +672,7 @@ module SnsMultipost
       goto_safely(HOME_URL)
       ready = wait_for(timeout: [@auth_timeout, 10].min) do
         state = safe_evaluate(LOGGED_IN_JS)
-        state && state["loggedIn"]
+        state && state["loggedIn"] && state["home"]
       end
       return true if ready
 
@@ -658,7 +680,7 @@ module SnsMultipost
       safe_evaluate(HOME_RESET_JS)
       wait_for(timeout: @auth_timeout) do
         state = safe_evaluate(LOGGED_IN_JS)
-        state && state["loggedIn"]
+        state && state["loggedIn"] && state["home"]
       end
     end
 

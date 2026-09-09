@@ -63,7 +63,8 @@ class JotterBrowserTest < Minitest::Test
     def evaluate(script, *_args)
       case script
       when SnsMultipost::JotterBrowser::LOGGED_IN_JS
-        { "loggedIn" => !@home_requires_reset || @home_reset }
+        { "loggedIn" => !@home_requires_reset || @home_reset,
+          "home" => @url == SnsMultipost::JotterBrowser::HOME_URL || @home_reset }
       when SnsMultipost::JotterBrowser::HOME_RESET_JS
         @home_reset = true
       when SnsMultipost::JotterBrowser::SAVEPOINT_READY_JS
@@ -281,6 +282,21 @@ class JotterBrowserTest < Minitest::Test
     end
 
     assert_match(/個別画面を確認できません/, error.message)
+  end
+
+  def test_post_detail_requires_a_recent_publication_time
+    script = SnsMultipost::JotterBrowser::POST_DETAIL_JS
+
+    assert_includes script, "time[datetime]"
+    assert_includes script, "年(\\d{1,2})月"
+    assert_includes script, "timestamp >= notBefore"
+  end
+
+  def test_existing_urls_include_current_individual_post
+    script = SnsMultipost::JotterBrowser::POST_URLS_JS
+
+    assert_includes script, "urls.push(location.href)"
+    assert_includes script, "new Set(urls)"
   end
 
   def test_individual_post_check_accepts_doc_and_hash_routes
