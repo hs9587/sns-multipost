@@ -45,6 +45,12 @@ class BloggerImageBrowserTest < Minitest::Test
     def xpath(selector) = selector == SnsMultipost::BloggerImageBrowser::PICKER_INSERT_XPATH ? [@insert].compact : []
   end
 
+  class ClosedFrame
+    def url
+      raise TransientNoExecutionContextError, "frame closed"
+    end
+  end
+
   class FakePage
     def command(_name)
       { "frameTree" => { "frame" => { "id" => "main", "url" => "https://www.blogger.com/" },
@@ -124,5 +130,16 @@ class BloggerImageBrowserTest < Minitest::Test
         draft_id: "99", media_paths: ["photo.png"])
 
     assert_equal ["https://blogger.googleusercontent.com/img/example/s0/photo.png"], result
+  end
+
+  def test_image_scan_ignores_closed_picker_frame
+    browser = FakeBrowser.new
+    editor = browser.frames.first
+    browser.define_singleton_method(:frames) { [ClosedFrame.new, editor] }
+    image_browser = SnsMultipost::BloggerImageBrowser.new(
+      blog_id: "42", browser: browser, timeout: 0,
+      sleeper: ->(_seconds) {})
+
+    assert_equal [], image_browser.send(:image_urls)
   end
 end

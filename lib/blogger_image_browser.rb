@@ -118,13 +118,18 @@ module SnsMultipost
     end
 
     def image_urls
-      browser.frames.reject { |frame| frame.url.to_s.start_with?("https://docs.google.com/") }
-             .flat_map do |frame|
+      browser.frames.flat_map do |frame|
+        next [] if frame.url.to_s.start_with?("https://docs.google.com/")
         next [] unless frame.execution_id
         frame.evaluate(IMAGE_URLS_JS)
-      rescue Ferrum::Error
+      rescue StandardError
+        # Google画像追加フレームは「選択／挿入」の直後に破棄される。
+        # browser.frames に一瞬残った無効なフレームのurlやcontextを
+        # 参照できなくても、ほかの本文フレームの確認を続ける。
         []
       end.uniq
+    rescue StandardError
+      []
     end
 
     def picker_insert_button(picker)
