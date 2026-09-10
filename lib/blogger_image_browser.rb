@@ -28,12 +28,14 @@ module SnsMultipost
     end
 
     def initialize(blog_id:, browser: nil, profile: BrowserProfile.new,
-                   headless: false, timeout: 30, sleeper: ->(seconds) { sleep seconds })
+                   headless: false, timeout: 30, upload_timeout: 60,
+                   sleeper: ->(seconds) { sleep seconds })
       @blog_id = blog_id.to_s
       @browser = browser
       @profile = profile
       @headless = headless
       @timeout = timeout
+      @upload_timeout = upload_timeout
       @sleeper = sleeper
       @owns_browser = browser.nil?
     end
@@ -78,8 +80,11 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       input.select_file(path)
 
+      uploaded = wait_for(timeout: @upload_timeout) { picker_image_urls(picker).first }
+      raise "Google画像追加画面でアップロード完了を確認できません: #{path}" unless uploaded
+
       insert_requested = false
-      added = wait_for(timeout: 60) do
+      added = wait_for(timeout: @upload_timeout) do
         url = (image_urls - known).first
         next url if url
 
@@ -143,6 +148,14 @@ module SnsMultipost
       end
     rescue Ferrum::Error
       nil
+    end
+
+    def picker_image_urls(picker)
+      return [] unless picker.execution_id
+
+      Array(picker.evaluate(IMAGE_URLS_JS))
+    rescue StandardError
+      []
     end
 
     def no_execution_context_error?(error)
