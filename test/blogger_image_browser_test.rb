@@ -91,7 +91,13 @@ class BloggerImageBrowserTest < Minitest::Test
     def goto(url) = (@goto_url = url)
     def css(_selector) = [@image_button]
     def xpath(_selector) = [@upload_option]
-    def frames = [@editor]
+    def frames
+      result = [@editor]
+      if @picker_open
+        result << (@picker_replaced ? @picker_after_upload : @picker_before_upload)
+      end
+      result
+    end
     def page = FakePage.new
     def frame_by(id:)
       return nil unless id == "picker" && @picker_open

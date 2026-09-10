@@ -8,10 +8,12 @@ module SnsMultipost
     UPLOAD_OPTION_XPATH = "//*[@aria-label='パソコンからアップロード' and @role='menuitem']".freeze
     PICKER_INSERT_XPATH = <<~'XPATH'.strip.freeze
       //*[self::button or @role='button'][
-        normalize-space(.)='選択' or normalize-space(.)='挿入' or
-        normalize-space(.)='Select' or normalize-space(.)='Insert' or
-        @aria-label='選択' or @aria-label='挿入' or
-        @aria-label='Select' or @aria-label='Insert'
+        starts-with(normalize-space(.), '選択') or
+        starts-with(normalize-space(.), '挿入') or
+        starts-with(normalize-space(.), 'Select') or
+        starts-with(normalize-space(.), 'Insert') or
+        starts-with(@aria-label, '選択') or starts-with(@aria-label, '挿入') or
+        starts-with(@aria-label, 'Select') or starts-with(@aria-label, 'Insert')
       ]
     XPATH
 
@@ -62,6 +64,7 @@ module SnsMultipost
       uploaded
     rescue StandardError
       capture_failure_screenshot(failure_screenshot_path)
+      capture_failure_diagnostics(failure_screenshot_path)
       raise
     ensure
       browser.quit if @owns_browser && @browser
@@ -87,12 +90,9 @@ module SnsMultipost
       # filesの再読込も行わない。アップロードの静定時間を置き、
       # 使用可能になった確定ボタンを押す。
       @sleeper.call(@upload_settle_seconds)
-      insert = wait_for(timeout: @upload_timeout) do
-        # ファイル選択に伴うフレーム内ナビゲーションでexecution contextが
-        # 更新されるため、選択前のFrameオブジェクトを使い続けない。
-        current_picker = picker_frame
-        picker_insert_button(current_picker) if current_picker
-      end
+      # ファイル選択に伴うナビゲーションでURLやexecution contextが更新される。
+      # docs.google.comという初期URLには依存せず、現在有効な全フレームから探す。
+      insert = wait_for(timeout: @upload_timeout) { picker_insert_button_from_frames }
       raise "Google画像追加画面の選択／挿入ボタンを押せません: #{path}" unless insert
       begin
         insert.evaluate("this.click()")
@@ -150,6 +150,24 @@ module SnsMultipost
       nil
     end
 
+    def picker_insert_button_from_frames
+      current_frames.each do |frame|
+        button = picker_insert_button(frame)
+        return button if button
+      end
+      nil
+    end
+
+    def current_frames
+      browser.frames.sort_by do |frame|
+        frame.url.to_s.start_with?("https://docs.google.com/") ? 0 : 1
+      rescue StandardError
+        2
+      end
+    rescue StandardError
+      []
+    end
+
     def no_execution_context_error?(error)
       error.class.name.end_with?("NoExecutionContextError")
     end
@@ -193,6 +211,44 @@ module SnsMultipost
       true
     rescue StandardError
       false
+    end
+
+    def capture_failure_diagnostics(path)
+      return false if path.to_s.empty? || !@browser
+
+      lines = current_frames.each_with_index.map do |frame, index|
+        buttons = frame.xpath("//*[self::button or @role='button']").filter_map do |node|
+          node.evaluate(<<~'JS')
+            (() => {
+              if (this.getClientRects().length === 0) return null;
+              const text = (this.innerText || this.textContent || '').trim().replace(/\s+/g, ' ');
+              const aria = (this.getAttribute('aria-label') || '').trim();
+              return {text: text.slice(0, 80), aria: aria.slice(0, 80),
+                      disabled: !!this.disabled,
+                      ariaDisabled: this.getAttribute('aria-disabled')};
+            })()
+          JS
+        rescue StandardError
+          nil
+        end.first(20)
+        "frame[#{index}] #{diagnostic_url(frame)} buttons=#{buttons.inspect}"
+      rescue StandardError => e
+        "frame[#{index}] unreadable=#{e.class}"
+      end
+      File.write(path.sub(/\.png\z/i, ".txt"), lines.join("\n") + "\n")
+      true
+    rescue StandardError
+      false
+    end
+
+    def diagnostic_url(frame)
+      require "uri"
+      uri = URI(frame.url.to_s)
+      return "(empty)" if uri.host.to_s.empty?
+
+      "#{uri.scheme}://#{uri.host}#{uri.path}"
+    rescue StandardError
+      "(unreadable)"
     end
 
     def browser
