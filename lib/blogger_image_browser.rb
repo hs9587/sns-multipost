@@ -82,15 +82,9 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       input.select_file(path)
 
-      accepted = wait_for(timeout: @upload_timeout) do
-        input.evaluate("this.files && this.files.length > 0")
-      rescue StandardError
-        false
-      end
-      raise "Google画像追加画面が画像ファイルを受理しませんでした: #{path}" unless accepted
-
       # Google画像追加画面の内部URLやDOMは変動するため、特定のプレビュー
-      # 要素には依存しない。ファイル受理後にアップロードの静定時間を置き、
+      # 要素には依存しない。select_file後に入力要素自体が差し替わるため
+      # filesの再読込も行わない。アップロードの静定時間を置き、
       # 使用可能になった確定ボタンを押す。
       @sleeper.call(@upload_settle_seconds)
       insert = wait_for(timeout: @upload_timeout) { picker_insert_button(picker) }

@@ -63,14 +63,12 @@ class BloggerImageBrowserTest < Minitest::Test
   class FakeBrowser
     attr_reader :goto_url, :selected, :quit_called, :upload_option, :insert_button
 
-    def initialize(context_lost_on_insert: false, file_accepted: true)
+    def initialize(context_lost_on_insert: false)
       @urls = []
       @image_button = FakeNode.new
       @picker_open = false
       @upload_option = FakeNode.new(on_evaluate: ->(_script) { @picker_open = true })
-      @input = FakeNode.new(
-        on_select_file: ->(path) { @selected = path },
-        on_evaluate: ->(script) { file_accepted if script.include?("this.files") })
+      @input = FakeNode.new(on_select_file: ->(path) { @selected = path })
       @insert_button = FakeNode.new(on_evaluate: lambda do |script|
         next unless script == "this.click()"
 
@@ -143,18 +141,4 @@ class BloggerImageBrowserTest < Minitest::Test
     assert_equal [], image_browser.send(:image_urls)
   end
 
-  def test_upload_does_not_insert_when_picker_rejects_file
-    browser = FakeBrowser.new(file_accepted: false)
-    image_browser = SnsMultipost::BloggerImageBrowser.new(
-      blog_id: "42", browser: browser, timeout: 0, upload_timeout: 0,
-      upload_settle_seconds: 0,
-      sleeper: ->(_seconds) {})
-
-    error = assert_raises(RuntimeError) do
-      image_browser.upload(draft_id: "99", media_paths: ["photo.png"])
-    end
-
-    assert_match(/画像ファイルを受理しませんでした/, error.message)
-    assert_empty browser.insert_button.evaluations
-  end
 end
