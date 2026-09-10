@@ -6,17 +6,6 @@ module SnsMultipost
     EDIT_URL = "https://www.blogger.com/blog/post/edit".freeze
     IMAGE_BUTTON_SELECTOR = '[aria-label="画像を挿入"]'.freeze
     UPLOAD_OPTION_XPATH = "//*[@aria-label='パソコンからアップロード' and @role='menuitem']".freeze
-    PICKER_INSERT_XPATH = <<~'XPATH'.strip.freeze
-      //*[self::button or @role='button'][
-        starts-with(normalize-space(.), '選択') or
-        starts-with(normalize-space(.), '挿入') or
-        starts-with(normalize-space(.), 'Select') or
-        starts-with(normalize-space(.), 'Insert') or
-        starts-with(@aria-label, '選択') or starts-with(@aria-label, '挿入') or
-        starts-with(@aria-label, 'Select') or starts-with(@aria-label, 'Insert')
-      ]
-    XPATH
-
     IMAGE_URLS_JS = <<~'JS'.freeze
       Array.from(document.images)
         .map((image) => image.currentSrc || image.src)
@@ -31,7 +20,6 @@ module SnsMultipost
 
     def initialize(blog_id:, browser: nil, profile: BrowserProfile.new,
                    headless: false, timeout: 30, upload_timeout: 60,
-                   upload_settle_seconds: 5,
                    sleeper: ->(seconds) { sleep seconds })
       @blog_id = blog_id.to_s
       @browser = browser
@@ -39,7 +27,6 @@ module SnsMultipost
       @headless = headless
       @timeout = timeout
       @upload_timeout = upload_timeout
-      @upload_settle_seconds = upload_settle_seconds
       @sleeper = sleeper
       @owns_browser = browser.nil?
     end
@@ -85,27 +72,11 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       input.select_file(path)
 
-      # Google画像追加画面の内部URLやDOMは変動するため、特定のプレビュー
-      # 要素には依存しない。select_file後に入力要素自体が差し替わるため
-      # filesの再読込も行わない。アップロードの静定時間を置き、
-      # 使用可能になった確定ボタンを押す。
-      @sleeper.call(@upload_settle_seconds)
-      # ファイル選択に伴うナビゲーションでURLやexecution contextが更新される。
-      # docs.google.comという初期URLには依存せず、現在有効な全フレームから探す。
-      insert = wait_for(timeout: @upload_timeout) { picker_insert_button_from_frames }
-      raise "Google画像追加画面の選択／挿入ボタンを押せません: #{path}" unless insert
-      begin
-        insert.evaluate("this.click()")
-      rescue StandardError => e
-        # クリックでGoogle画像追加フレームが閉じると、CDPの応答より先に
-        # execution contextが破棄されることがある。クリック後の正常な遷移
-        # として本文側の画像出現を待つ。
-        raise unless no_execution_context_error?(e)
-      end
-
-      added = wait_for(timeout: @upload_timeout) { (image_urls - known).first }
-      raise "Blogger本文への画像挿入を確認できません: #{path}" unless added
-      added
+      # Google画像画面のフレームはアップロード後すぐ切断されることがある。
+      # 静定待ちや本文挿入を挟まず、発行された画像URLを直ちに取得する。
+      uploaded = wait_for(timeout: @upload_timeout) { (image_urls - known).first }
+      raise "Google画像ストアへのアップロードを確認できません: #{path}" unless uploaded
+      uploaded
     end
 
     # Ferrum's coordinate click can occasionally miss this floating menu item.
@@ -123,8 +94,7 @@ module SnsMultipost
     end
 
     def image_urls
-      browser.frames.flat_map do |frame|
-        next [] if frame.url.to_s.start_with?("https://docs.google.com/")
+      current_frames.flat_map do |frame|
         next [] unless frame.execution_id
         frame.evaluate(IMAGE_URLS_JS)
       rescue StandardError
@@ -137,27 +107,6 @@ module SnsMultipost
       []
     end
 
-    def picker_insert_button(picker)
-      picker.xpath(PICKER_INSERT_XPATH).find do |node|
-        node.evaluate(<<~'JS')
-          this.getClientRects().length > 0 && !this.disabled &&
-            this.getAttribute('aria-disabled') !== 'true'
-        JS
-      rescue Ferrum::Error
-        false
-      end
-    rescue Ferrum::Error
-      nil
-    end
-
-    def picker_insert_button_from_frames
-      current_frames.each do |frame|
-        button = picker_insert_button(frame)
-        return button if button
-      end
-      nil
-    end
-
     def current_frames
       browser.frames.sort_by do |frame|
         frame.url.to_s.start_with?("https://docs.google.com/") ? 0 : 1
@@ -166,10 +115,6 @@ module SnsMultipost
       end
     rescue StandardError
       []
-    end
-
-    def no_execution_context_error?(error)
-      error.class.name.end_with?("NoExecutionContextError")
     end
 
     def picker_frame
@@ -221,8 +166,10 @@ module SnsMultipost
           node.evaluate(<<~'JS')
             (() => {
               if (this.getClientRects().length === 0) return null;
-              const text = (this.innerText || this.textContent || '').trim().replace(/\s+/g, ' ');
-              const aria = (this.getAttribute('aria-label') || '').trim();
+              const redact = (value) => value.replace(
+                /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig, '[redacted-email]');
+              const text = redact((this.innerText || this.textContent || '').trim().replace(/\s+/g, ' '));
+              const aria = redact((this.getAttribute('aria-label') || '').trim());
               return {text: text.slice(0, 80), aria: aria.slice(0, 80),
                       disabled: !!this.disabled,
                       ariaDisabled: this.getAttribute('aria-disabled')};

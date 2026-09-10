@@ -32,17 +32,16 @@ class BloggerImageBrowserTest < Minitest::Test
   class FakeFrame
     attr_reader :execution_id, :url
 
-    def initialize(url:, urls: nil, input: nil, insert: nil)
+    def initialize(url:, urls: nil, input: nil)
       @execution_id = 1
       @url = url
       @urls = urls
       @input = input
-      @insert = insert
     end
 
     def evaluate(_script) = @urls || []
     def at_css(selector) = selector == 'input[type="file"]' ? @input : nil
-    def xpath(selector) = selector == SnsMultipost::BloggerImageBrowser::PICKER_INSERT_XPATH ? [@insert].compact : []
+    def xpath(_selector) = []
   end
 
   class ClosedFrame
@@ -61,31 +60,21 @@ class BloggerImageBrowserTest < Minitest::Test
   end
 
   class FakeBrowser
-    attr_reader :goto_url, :selected, :quit_called, :upload_option, :insert_button
+    attr_reader :goto_url, :selected, :quit_called, :upload_option
 
-    def initialize(context_lost_on_insert: false, replace_picker_after_select: false)
-      @urls = []
+    def initialize
+      @editor_urls = []
+      @picker_urls = []
       @image_button = FakeNode.new
       @picker_open = false
-      @picker_replaced = false
       @upload_option = FakeNode.new(on_evaluate: ->(_script) { @picker_open = true })
       @input = FakeNode.new(on_select_file: lambda do |path|
         @selected = path
-        @picker_replaced = true if replace_picker_after_select
+        @picker_urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
       end)
-      @insert_button = FakeNode.new(on_evaluate: lambda do |script|
-        next unless script == "this.click()"
-
-        @urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
-        @picker_open = false
-        raise TransientNoExecutionContextError, "frame closed" if context_lost_on_insert
-      end)
-      @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @urls)
-      @picker_before_upload = FakeFrame.new(
-        url: "https://docs.google.com/picker", input: @input,
-        insert: replace_picker_after_select ? nil : @insert_button)
-      @picker_after_upload = FakeFrame.new(
-        url: "https://docs.google.com/picker", input: @input, insert: @insert_button)
+      @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @editor_urls)
+      @picker = FakeFrame.new(
+        url: "https://docs.google.com/picker", urls: @picker_urls, input: @input)
     end
 
     def goto(url) = (@goto_url = url)
@@ -93,16 +82,14 @@ class BloggerImageBrowserTest < Minitest::Test
     def xpath(_selector) = [@upload_option]
     def frames
       result = [@editor]
-      if @picker_open
-        result << (@picker_replaced ? @picker_after_upload : @picker_before_upload)
-      end
+      result << @picker if @picker_open
       result
     end
     def page = FakePage.new
     def frame_by(id:)
       return nil unless id == "picker" && @picker_open
 
-      @picker_replaced ? @picker_after_upload : @picker_before_upload
+      @picker
     end
     def quit = (@quit_called = true)
   end
@@ -122,7 +109,6 @@ class BloggerImageBrowserTest < Minitest::Test
     assert_equal "photo.png", browser.selected
     assert_includes browser.upload_option.evaluations, "this.click()"
     assert_equal 0, browser.upload_option.clicks
-    assert_includes browser.insert_button.evaluations, "this.click()"
     assert_equal [expected], result
     assert_equal [["photo.png", expected]], yielded
     assert_nil browser.quit_called
@@ -136,8 +122,8 @@ class BloggerImageBrowserTest < Minitest::Test
                    "https://blogger.googleusercontent.com/x/s640/a.png")
   end
 
-  def test_upload_waits_for_editor_image_when_picker_context_closes_on_insert
-    browser = FakeBrowser.new(context_lost_on_insert: true)
+  def test_upload_uses_image_url_from_picker_without_inserting_into_editor
+    browser = FakeBrowser.new
 
     result = SnsMultipost::BloggerImageBrowser.new(
       blog_id: "42", browser: browser, timeout: 0,
@@ -156,19 +142,6 @@ class BloggerImageBrowserTest < Minitest::Test
       sleeper: ->(_seconds) {})
 
     assert_equal [], image_browser.send(:image_urls)
-  end
-
-  def test_upload_reacquires_picker_after_file_selection
-    browser = FakeBrowser.new(replace_picker_after_select: true)
-
-    result = SnsMultipost::BloggerImageBrowser.new(
-      blog_id: "42", browser: browser, timeout: 0,
-      upload_settle_seconds: 0,
-      sleeper: ->(_seconds) {}).upload(
-        draft_id: "99", media_paths: ["photo.png"])
-
-    assert_equal ["https://blogger.googleusercontent.com/img/example/s0/photo.png"], result
-    assert_includes browser.insert_button.evaluations, "this.click()"
   end
 
 end
