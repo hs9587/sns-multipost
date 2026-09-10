@@ -87,7 +87,12 @@ module SnsMultipost
       # filesの再読込も行わない。アップロードの静定時間を置き、
       # 使用可能になった確定ボタンを押す。
       @sleeper.call(@upload_settle_seconds)
-      insert = wait_for(timeout: @upload_timeout) { picker_insert_button(picker) }
+      insert = wait_for(timeout: @upload_timeout) do
+        # ファイル選択に伴うフレーム内ナビゲーションでexecution contextが
+        # 更新されるため、選択前のFrameオブジェクトを使い続けない。
+        current_picker = picker_frame
+        picker_insert_button(current_picker) if current_picker
+      end
       raise "Google画像追加画面の選択／挿入ボタンを押せません: #{path}" unless insert
       begin
         insert.evaluate("this.click()")
