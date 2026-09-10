@@ -17,8 +17,8 @@ class BloggerImageBrowserTest < Minitest::Test
 
     def evaluate(script)
       @evaluations << script
-      @on_evaluate&.call(script)
-      true
+      result = @on_evaluate&.call(script)
+      result.nil? ? true : result
     end
 
     def click
@@ -63,18 +63,14 @@ class BloggerImageBrowserTest < Minitest::Test
   class FakeBrowser
     attr_reader :goto_url, :selected, :quit_called, :upload_option, :insert_button
 
-    def initialize(context_lost_on_insert: false, preview_after_select: true)
+    def initialize(context_lost_on_insert: false, file_accepted: true)
       @urls = []
-      @picker_urls = []
       @image_button = FakeNode.new
       @picker_open = false
       @upload_option = FakeNode.new(on_evaluate: ->(_script) { @picker_open = true })
-      @input = FakeNode.new(on_select_file: lambda do |path|
-        @selected = path
-        if preview_after_select
-          @picker_urls << "https://blogger.googleusercontent.com/img/example/s320/preview.png"
-        end
-      end)
+      @input = FakeNode.new(
+        on_select_file: ->(path) { @selected = path },
+        on_evaluate: ->(script) { file_accepted if script.include?("this.files") })
       @insert_button = FakeNode.new(on_evaluate: lambda do |script|
         next unless script == "this.click()"
 
@@ -84,8 +80,7 @@ class BloggerImageBrowserTest < Minitest::Test
       end)
       @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @urls)
       @picker = FakeFrame.new(
-        url: "https://docs.google.com/picker", urls: @picker_urls,
-        input: @input, insert: @insert_button)
+        url: "https://docs.google.com/picker", input: @input, insert: @insert_button)
     end
 
     def goto(url) = (@goto_url = url)
@@ -148,17 +143,18 @@ class BloggerImageBrowserTest < Minitest::Test
     assert_equal [], image_browser.send(:image_urls)
   end
 
-  def test_upload_does_not_insert_before_picker_upload_finishes
-    browser = FakeBrowser.new(preview_after_select: false)
+  def test_upload_does_not_insert_when_picker_rejects_file
+    browser = FakeBrowser.new(file_accepted: false)
     image_browser = SnsMultipost::BloggerImageBrowser.new(
       blog_id: "42", browser: browser, timeout: 0, upload_timeout: 0,
+      upload_settle_seconds: 0,
       sleeper: ->(_seconds) {})
 
     error = assert_raises(RuntimeError) do
       image_browser.upload(draft_id: "99", media_paths: ["photo.png"])
     end
 
-    assert_match(/アップロード完了を確認できません/, error.message)
+    assert_match(/画像ファイルを受理しませんでした/, error.message)
     assert_empty browser.insert_button.evaluations
   end
 end

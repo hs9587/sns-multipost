@@ -29,6 +29,7 @@ module SnsMultipost
 
     def initialize(blog_id:, browser: nil, profile: BrowserProfile.new,
                    headless: false, timeout: 30, upload_timeout: 60,
+                   upload_settle_seconds: 5,
                    sleeper: ->(seconds) { sleep seconds })
       @blog_id = blog_id.to_s
       @browser = browser
@@ -36,6 +37,7 @@ module SnsMultipost
       @headless = headless
       @timeout = timeout
       @upload_timeout = upload_timeout
+      @upload_settle_seconds = upload_settle_seconds
       @sleeper = sleeper
       @owns_browser = browser.nil?
     end
@@ -80,30 +82,29 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       input.select_file(path)
 
-      uploaded = wait_for(timeout: @upload_timeout) { picker_image_urls(picker).first }
-      raise "Google画像追加画面でアップロード完了を確認できません: #{path}" unless uploaded
-
-      insert_requested = false
-      added = wait_for(timeout: @upload_timeout) do
-        url = (image_urls - known).first
-        next url if url
-
-        unless insert_requested
-          insert = picker_insert_button(picker)
-          if insert
-            begin
-              insert.evaluate("this.click()")
-            rescue StandardError => e
-              # クリックでGoogle画像追加フレームが閉じると、CDPの応答より先に
-              # execution contextが破棄されることがある。クリック後の正常な遷移
-              # として本文側の画像出現を待つ。
-              raise unless no_execution_context_error?(e)
-            end
-            insert_requested = true
-          end
-        end
-        nil
+      accepted = wait_for(timeout: @upload_timeout) do
+        input.evaluate("this.files && this.files.length > 0")
+      rescue StandardError
+        false
       end
+      raise "Google画像追加画面が画像ファイルを受理しませんでした: #{path}" unless accepted
+
+      # Google画像追加画面の内部URLやDOMは変動するため、特定のプレビュー
+      # 要素には依存しない。ファイル受理後にアップロードの静定時間を置き、
+      # 使用可能になった確定ボタンを押す。
+      @sleeper.call(@upload_settle_seconds)
+      insert = wait_for(timeout: @upload_timeout) { picker_insert_button(picker) }
+      raise "Google画像追加画面の選択／挿入ボタンを押せません: #{path}" unless insert
+      begin
+        insert.evaluate("this.click()")
+      rescue StandardError => e
+        # クリックでGoogle画像追加フレームが閉じると、CDPの応答より先に
+        # execution contextが破棄されることがある。クリック後の正常な遷移
+        # として本文側の画像出現を待つ。
+        raise unless no_execution_context_error?(e)
+      end
+
+      added = wait_for(timeout: @upload_timeout) { (image_urls - known).first }
       raise "Blogger本文への画像挿入を確認できません: #{path}" unless added
       added
     end
@@ -148,14 +149,6 @@ module SnsMultipost
       end
     rescue Ferrum::Error
       nil
-    end
-
-    def picker_image_urls(picker)
-      return [] unless picker.execution_id
-
-      Array(picker.evaluate(IMAGE_URLS_JS))
-    rescue StandardError
-      []
     end
 
     def no_execution_context_error?(error)
