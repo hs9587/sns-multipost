@@ -72,7 +72,7 @@ module SnsMultipost
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
       network_urls = []
       network_events = []
-      subscription = observe_image_responses(network_urls, network_events)
+      subscriptions = observe_image_traffic(network_urls, network_events)
       input.select_file(path)
 
       # Google画像画面のフレームはアップロード後すぐ切断されることがある。
@@ -84,7 +84,7 @@ module SnsMultipost
       raise "Google画像ストアへのアップロードを確認できません: #{path}" unless uploaded
       uploaded
     ensure
-      browser.page.off("Network.responseReceived", subscription) if subscription
+      Array(subscriptions).each { |event, id| browser.page.off(event, id) }
     end
 
     # Ferrum's coordinate click can occasionally miss this floating menu item.
@@ -125,22 +125,32 @@ module SnsMultipost
       []
     end
 
-    def observe_image_responses(image_urls, events)
+    def observe_image_traffic(image_urls, events)
       browser.page.command("Network.enable")
-      browser.page.on("Network.responseReceived") do |params, *_unused|
+      request_id = browser.page.on("Network.requestWillBeSent") do |params, *_unused|
+        url = params.dig("request", "url").to_s
+        record_network_event(events, "request", url)
+      end
+      response_id = browser.page.on("Network.responseReceived") do |params, *_unused|
         response = params["response"] || {}
         url = response["url"].to_s
         image_urls << url if url.start_with?("https://blogger.googleusercontent.com/")
-
-        host_path = diagnostic_network_url(url)
-        if host_path && events.length < 100
-          events << {
-            url: host_path,
-            status: response["status"],
-            mime: response["mimeType"].to_s[0, 80]
-          }
-        end
+        record_network_event(
+          events, "response", url,
+          status: response["status"], mime: response["mimeType"])
       end
+      [["Network.requestWillBeSent", request_id],
+       ["Network.responseReceived", response_id]]
+    end
+
+    def record_network_event(events, kind, url, status: nil, mime: nil)
+      host_path = diagnostic_network_url(url)
+      return unless host_path && events.length < 100
+
+      events << {
+        kind: kind, url: host_path, status: status,
+        mime: mime.to_s[0, 80]
+      }
     end
 
     def diagnostic_network_url(url)
@@ -198,37 +208,23 @@ module SnsMultipost
     def capture_failure_diagnostics(path)
       return false if path.to_s.empty? || !@browser
 
-      lines = current_frames.each_with_index.map do |frame, index|
-        buttons = frame.xpath("//*[self::button or @role='button']").filter_map do |node|
-          node.evaluate(<<~'JS')
-            (() => {
-              if (this.getClientRects().length === 0) return null;
-              const redact = (value) => value.replace(
-                /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig, '[redacted-email]');
-              const text = redact((this.innerText || this.textContent || '').trim().replace(/\s+/g, ' '));
-              const aria = redact((this.getAttribute('aria-label') || '').trim());
-              return {text: text.slice(0, 80), aria: aria.slice(0, 80),
-                      disabled: !!this.disabled,
-                      ariaDisabled: this.getAttribute('aria-disabled')};
-            })()
-          JS
-        rescue StandardError
-          nil
-        end.first(20)
-        "frame[#{index}] #{diagnostic_url(frame)} buttons=#{buttons.inspect}"
-      rescue StandardError => e
-        "frame[#{index}] unreadable=#{e.class}"
+      require "timeout"
+      lines = ["network=#{Array(@network_diagnostics).inspect}"]
+      Timeout.timeout(5) do
+        tree = browser.page.command("Page.getFrameTree").fetch("frameTree")
+        flatten_frames(tree).each_with_index do |frame, index|
+          lines << "frame[#{index}] #{diagnostic_url_value(frame.fetch('url', ''))}"
+        end
       end
-      lines << "network=#{Array(@network_diagnostics).inspect}"
       File.write(path.sub(/\.png\z/i, ".txt"), lines.join("\n") + "\n")
       true
     rescue StandardError
       false
     end
 
-    def diagnostic_url(frame)
+    def diagnostic_url_value(value)
       require "uri"
-      uri = URI(frame.url.to_s)
+      uri = URI(value.to_s)
       return "(empty)" if uri.host.to_s.empty?
 
       "#{uri.scheme}://#{uri.host}#{uri.path}"

@@ -46,9 +46,9 @@ ruby spike/blogger_image_upload.rb PATH_TO_IMAGE
 - 画像SHA-256と元画像URLをキーに `state/blogger_image_store.json` へURLを保存する。
 - プロセス中断に備えて一時下書きIDも同ファイルへ先に保存し、次回画像投稿時に削除する。
 - ブラウザ操作失敗時は対応する `failed/*.png` を保存する。
-- 失敗時は画面構造の変化を追えるよう、フレームURL（クエリなし）と表示中ボタンの
-  ラベル、Google/Blogger関連通信のURL（クエリなし）とHTTP状態だけを対応する
-  `failed/*.txt` に保存する。メールアドレスは伏字にする。
+- 失敗時は画面構造の変化を追えるよう、フレームURL（クエリなし）とGoogle/Blogger関連通信の
+  URL（クエリなし）・HTTP状態だけを対応する `failed/*.txt` に保存する。診断は最大5秒で打ち切り、
+  切断済みフレームへDOM問い合わせを行わない。
 
 ## 通常投稿の実地確認
 
