@@ -70,13 +70,21 @@ module SnsMultipost
       raise "Google画像追加画面を確認できません" unless picker
       input = wait_for { picker.at_css('input[type="file"]') rescue nil }
       raise "Google画像追加画面のファイル入力が見つかりません" unless input
+      network_urls = []
+      network_events = []
+      subscription = observe_image_responses(network_urls, network_events)
       input.select_file(path)
 
       # Google画像画面のフレームはアップロード後すぐ切断されることがある。
-      # 静定待ちや本文挿入を挟まず、発行された画像URLを直ちに取得する。
-      uploaded = wait_for(timeout: @upload_timeout) { (image_urls - known).first }
+      # DOMだけでなく、切断に影響されないNetwork.responseReceivedも監視する。
+      uploaded = wait_for(timeout: @upload_timeout) do
+        ((image_urls - known) + network_urls).first
+      end
+      @network_diagnostics = network_events
       raise "Google画像ストアへのアップロードを確認できません: #{path}" unless uploaded
       uploaded
+    ensure
+      browser.page.off("Network.responseReceived", subscription) if subscription
     end
 
     # Ferrum's coordinate click can occasionally miss this floating menu item.
@@ -115,6 +123,35 @@ module SnsMultipost
       end
     rescue StandardError
       []
+    end
+
+    def observe_image_responses(image_urls, events)
+      browser.page.command("Network.enable")
+      browser.page.on("Network.responseReceived") do |params, *_unused|
+        response = params["response"] || {}
+        url = response["url"].to_s
+        image_urls << url if url.start_with?("https://blogger.googleusercontent.com/")
+
+        host_path = diagnostic_network_url(url)
+        if host_path && events.length < 100
+          events << {
+            url: host_path,
+            status: response["status"],
+            mime: response["mimeType"].to_s[0, 80]
+          }
+        end
+      end
+    end
+
+    def diagnostic_network_url(url)
+      require "uri"
+      uri = URI(url)
+      host = uri.host.to_s
+      return nil unless host.include?("google") || host.include?("blogger")
+
+      "#{uri.scheme}://#{host}#{uri.path}"
+    rescue StandardError
+      nil
     end
 
     def picker_frame
@@ -182,6 +219,7 @@ module SnsMultipost
       rescue StandardError => e
         "frame[#{index}] unreadable=#{e.class}"
       end
+      lines << "network=#{Array(@network_diagnostics).inspect}"
       File.write(path.sub(/\.png\z/i, ".txt"), lines.join("\n") + "\n")
       true
     rescue StandardError

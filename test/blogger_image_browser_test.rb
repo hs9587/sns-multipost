@@ -51,26 +51,52 @@ class BloggerImageBrowserTest < Minitest::Test
   end
 
   class FakePage
-    def command(_name)
+    def initialize
+      @callbacks = {}
+    end
+
+    def command(name)
+      return {} if name == "Network.enable"
+
       { "frameTree" => { "frame" => { "id" => "main", "url" => "https://www.blogger.com/" },
                            "childFrames" => [
                              { "frame" => { "id" => "picker", "url" => "https://docs.google.com/picker" } }
                            ] } }
+    end
+
+    def on(name, &block)
+      @callbacks[name] = block
+      0
+    end
+
+    def off(name, _id)
+      @callbacks.delete(name)
+    end
+
+    def emit_image(url)
+      @callbacks["Network.responseReceived"]&.call(
+        { "response" => { "url" => url, "status" => 200, "mimeType" => "image/png" } })
     end
   end
 
   class FakeBrowser
     attr_reader :goto_url, :selected, :quit_called, :upload_option
 
-    def initialize
+    def initialize(network_only: false)
       @editor_urls = []
       @picker_urls = []
+      @page = FakePage.new
       @image_button = FakeNode.new
       @picker_open = false
       @upload_option = FakeNode.new(on_evaluate: ->(_script) { @picker_open = true })
       @input = FakeNode.new(on_select_file: lambda do |path|
         @selected = path
-        @picker_urls << "https://blogger.googleusercontent.com/img/example/s320/photo.png"
+        url = "https://blogger.googleusercontent.com/img/example/s320/photo.png"
+        if network_only
+          @page.emit_image(url)
+        else
+          @picker_urls << url
+        end
       end)
       @editor = FakeFrame.new(url: "https://www.blogger.com/editor", urls: @editor_urls)
       @picker = FakeFrame.new(
@@ -85,7 +111,7 @@ class BloggerImageBrowserTest < Minitest::Test
       result << @picker if @picker_open
       result
     end
-    def page = FakePage.new
+    def page = @page
     def frame_by(id:)
       return nil unless id == "picker" && @picker_open
 
@@ -124,6 +150,17 @@ class BloggerImageBrowserTest < Minitest::Test
 
   def test_upload_uses_image_url_from_picker_without_inserting_into_editor
     browser = FakeBrowser.new
+
+    result = SnsMultipost::BloggerImageBrowser.new(
+      blog_id: "42", browser: browser, timeout: 0,
+      sleeper: ->(_seconds) {}).upload(
+        draft_id: "99", media_paths: ["photo.png"])
+
+    assert_equal ["https://blogger.googleusercontent.com/img/example/s0/photo.png"], result
+  end
+
+  def test_upload_uses_network_url_when_picker_context_disappears
+    browser = FakeBrowser.new(network_only: true)
 
     result = SnsMultipost::BloggerImageBrowser.new(
       blog_id: "42", browser: browser, timeout: 0,

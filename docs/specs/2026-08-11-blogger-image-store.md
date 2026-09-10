@@ -15,6 +15,8 @@ Blogger API v3には画像アップロード口がないため、画像だけを
 - 通常実装ではファイル選択直後から全フレームを監視し、Google画像画面に一時的に現れる
   `blogger.googleusercontent.com` URLを取得する。画像ストアとして必要なのはこのURLであり、
   不安定な「選択／挿入」操作やBlogger本文への挿入は要求しない。
+- フレーム内DOMに加えてChromeの `Network.responseReceived` も監視し、画面が切断される前に
+  読み込まれた `blogger.googleusercontent.com` URLを取得する。
 - Google画像フレームはアップロード後すぐ切断される場合があるため、静定待ちを挟まずURLを取得する。
   閉じたフレームがChromeのフレーム一覧に一時的に残り、URLや実行コンテキストを読めない場合は
   そのフレームだけを除外して監視を続ける。
@@ -45,7 +47,8 @@ ruby spike/blogger_image_upload.rb PATH_TO_IMAGE
 - プロセス中断に備えて一時下書きIDも同ファイルへ先に保存し、次回画像投稿時に削除する。
 - ブラウザ操作失敗時は対応する `failed/*.png` を保存する。
 - 失敗時は画面構造の変化を追えるよう、フレームURL（クエリなし）と表示中ボタンの
-  ラベルだけを対応する `failed/*.txt` に保存する。
+  ラベル、Google/Blogger関連通信のURL（クエリなし）とHTTP状態だけを対応する
+  `failed/*.txt` に保存する。メールアドレスは伏字にする。
 
 ## 通常投稿の実地確認
 
