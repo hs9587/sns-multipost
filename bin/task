@@ -13,12 +13,13 @@ minutes = 10
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/task [options] [ACTION]",
   description: "sns-multipost用Windowsタスクスケジューラの状態確認、登録、解除、有効化、一時停止を行います。\nPowerShell、コマンドプロンプト、Git Bashから同じように実行できます。",
-  examples: ["ruby bin/task", "ruby bin/task disable", "ruby bin/task enable",
+  examples: ["ruby bin/task", "ruby bin/task dis", "ruby bin/task en",
+             "ruby bin/task disable", "ruby bin/task enable",
              "ruby bin/task register", "ruby bin/task unregister",
              "ruby bin/task register --minutes 10",
              "ruby bin/task register --runner C:\\path\\custom-runner.bat"],
   notes: ["ACTIONを省略すると状態を読み取るだけです。",
-          "ACTIONは register、unregister、enable、disable のいずれかです。",
+          "ACTIONは register、unregister、enable、disable のいずれかです。enはenable、disはdisableの短縮名です。",
           "registerの既定はリポジトリ内の bin/task_run を現在のRubyで10分間隔に実行します。",
           "registerは同名タスクを上書きして有効化し、バッテリ動作と多重起動防止を設定します。",
           "unregisterはタスク登録だけを解除し、バッチ、ログ、ジョブは削除しません。",
@@ -43,13 +44,15 @@ SnsMultipost::Cli.parse!(parser)
 if task_name.to_s.strip.empty?
   SnsMultipost::Cli.usage_error(parser, "タスク名を指定してください")
 end
+action_aliases = { "en" => "enable", "dis" => "disable" }.freeze
 actions = %w[register unregister enable disable]
-unless ARGV.length <= 1 && (ARGV.empty? || actions.include?(ARGV.first))
+requested_action = ARGV.first
+action = action_aliases.fetch(requested_action, requested_action)
+unless ARGV.length <= 1 && (ARGV.empty? || actions.include?(action))
   SnsMultipost::Cli.usage_error(
-    parser, "ACTIONを省略するか、register、unregister、enable、disable のいずれかを指定してください")
+    parser, "ACTIONを省略するか、register、unregister、enable（en）、disable（dis）のいずれかを指定してください")
 end
 
-action = ARGV.first
 begin
   case action
   when "register"

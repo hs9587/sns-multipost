@@ -70,6 +70,8 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "PowerShell、コマンドプロンプト、Git Bash"
     assert_includes stdout, "enable"
     assert_includes stdout, "disable"
+    assert_includes stdout, "enはenable"
+    assert_includes stdout, "disはdisable"
     assert_includes stdout, "register"
     assert_includes stdout, "unregister"
     assert_includes stdout, "--runner PATH"
@@ -92,7 +94,7 @@ class CliHelpTest < Minitest::Test
     [["start"], ["enable", "extra"]].each do |arguments|
       _stdout, stderr, status = run_cli("task", *arguments)
       assert_equal 2, status.exitstatus
-      assert_includes stderr, "ACTIONを省略するか、register、unregister、enable、disable"
+      assert_includes stderr, "ACTIONを省略するか、register、unregister、enable（en）、disable（dis）"
       assert_includes stderr, "Usage: ruby bin/task"
     end
   end
