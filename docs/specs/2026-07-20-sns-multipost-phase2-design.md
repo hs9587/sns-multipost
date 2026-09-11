@@ -1,13 +1,13 @@
-# sns-multipost Phase 2 設計ドキュメント（API組ポスター）
+# sns-multipost API組ポスター 設計・実装記録
 
 - 日付: 2026-07-20
-- 状態: 実装完了・実投稿確認済み。X API は認証確認のみで終了し、実運用は Phase 3 のブラウザ投稿へ切替
-- 前提: Phase 1 完了（`Poster::Base` パターン・ファイルキュー・injected transport・config.yml 確立済み）
+- 状態: 実装完了・実投稿確認済み。X APIは認証確認のみで終了し、課金・ブラウザ自動化は行わない
+- 前提: `Poster::Base` パターン、ファイルキュー、injected transport、config.ymlの基盤を利用
 - リポジトリ: GitHub `hs9587/sns-multipost`（既存 main に追加）
 
 ## 1. 目的
 
-Phase 1 で確立した基盤の上に、API で投稿できる4 SNS のポスターを追加する。動機は Phase 1 と同じ（MT変換機の開発データ作成 =「いろんな SNS に投稿している状態」を作る）。
+確立済みの基盤へ、APIで投稿できる4 SNSのポスターを追加する。動機はMT変換機の開発データ作成、すなわち「いろんなSNSに投稿している状態」を作ることにある。
 
 ## 2. スコープと順序
 
@@ -19,7 +19,7 @@ API組4ポスターを**認証の軽い順に1本ずつ**追加した:
 
 ## 3. 認証
 
-すべて `config.yml` に値を置き、Claude は値を見ない（Phase 1 と同じ流儀）。トークンの初回取得は外部（各開発者コンソール等）で行う。
+すべて `config.yml` に値を置き、開発作業では内容を参照しない。トークンの初回取得は外部（各開発者コンソール等）で行う。
 
 | SNS | 認証 | config.yml のキー |
 |-----|------|------------------|
@@ -42,10 +42,10 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 
 - **Bluesky**: `com.atproto.repo.uploadBlob` で画像を上げ、`app.bsky.feed.post` レコードに embed（images）。テキスト上限 300 grapheme、画像4枚・2MB/枚
 - **Tumblr**: `POST /v2/blog/{blog_identifier}/posts`（NPF: Neue Post Format）でテキストブロック＋画像ブロック。テキスト緩め、画像10枚
-- **Blogger**: Blogger API v3 に画像アップロード口がないため、専用Chromeで非公開の一時下書きへ画像を挿入し、取得した `blogger.googleusercontent.com` URLを本文HTMLへ埋め込んで `posts.insert`。一時下書きはAPIで削除する。**タイトル必須**なので title_rules の導出タイトルを使う（本文の改行は `<br>`/`<p>` へ）
+- **Blogger**: Blogger API v3に画像アップロード口がないため、APIで非公開の一時下書きを作り、専用Chromeから内部画像ストアへ画像をアップロードする。取得した `blogger.googleusercontent.com` URLを本文HTMLへ埋め込んで `posts.insert` し、一時下書きはAPIで削除する。**タイトル必須**なので title_rules の導出タイトルを使う（本文の改行は `<br>`/`<p>` へ）
 - **X**: OAuth1.0a 署名付き `POST /2/media/upload` で画像 → `POST /2/tweets` に `media.media_ids`。`media_category=tweet_image` 必須。テキスト上限 280、画像4枚・約5MB/枚
 
-各ポスターは Phase 1 の Fedibird 同様、非2xx で `RuntimeError`（ステータス＋本文先頭200字）、成功時に投稿 URL/id を返す。テストは injected transport lambda で実ネットワークなし。
+各ポスターはFedibirdと同様、非2xxで `RuntimeError`（ステータス＋本文先頭200字）、成功時に投稿URL/idを返す。テストはinjected transport lambdaで実ネットワークなし。
 
 ## 5. 共通の追加（lib）
 
@@ -59,27 +59,27 @@ refresh token の両方が更新されるため、`TumblrToken` と `TokenStore`
 ## 6. テスト
 
 - **単体テスト（injected transport lambda、実ネットワークなし）**: 各ポスターについてリクエスト組み立て、テキスト上限、画像サイズ、OAuth1署名、Blogger/Tumblr refresh を検証
-- **実投稿確認**: Fedibird / Bluesky / Tumblr / Blogger はライブ投稿成功。X は OAuth1.0a 認証通過後に 402 `credits depleted` となり、ライブ投稿だけを保留
-- dry_run は全ポスターで末端まで伝播（Phase 1 の `Poster::Base` の仕組みをそのまま利用）
+- **実投稿確認**: Fedibird / Bluesky / Tumblr / Blogger はライブ投稿成功。X は OAuth1.0a 認証通過後に 402 `credits depleted` となり、課金せずライブ投稿は行わない
+- dry_runは全ポスターで末端まで伝播（`Poster::Base` の仕組みを利用）
 
-## 7. スコープ外（Phase 2 に入れない）
+## 7. 当時のスコープ外
 
 - 対話型 OAuth の内蔵（Q2-b。初回トークン取得は外部）
-- 画像の縮小・再圧縮（Q5-b。超過画像は落とすだけ）
-- ブラウザ組（X / Instagram / mixi / mixi2 / Jotter）は Phase 3
-- X API の課金判断（2026-08-04に「購入せずブラウザ投稿へ切替」で確定）
+- 画像の縮小・再圧縮（当初は超過画像を落とす方針。その後Bluesky向け縮小を実装）
+- ブラウザ投稿先（その後mixi / mixi2 / Jotterを実装）
+- X APIの課金判断（2026-08-04に「購入しない」と確定。その後、公式ルール上ブラウザ自動化もしない方針とした）
 - 本文が長い時の「リンク付き続き」方式（Q4-b。まず単純切り詰め）
 
 ## 8. リスク・留意
 
-- **X の課金**: Pay Per Use のクレジットは購入しない。OAuth1.0a実装は保管し、実運用はPhase 3のブラウザ投稿とする
+- **X の課金**: Pay Per Use のクレジットは購入しない。OAuth1.0a実装は保管し、公式ルール上ブラウザ自動化も行わない
 - **Tumblr の token rotation**: 最新 refresh token は `state/tumblr_token.json` にしかない場合がある。失った場合はOAuth認可をやり直す
-- **Blogger の画像**: 内部画像ストアへのブラウザアップロードを既存API投稿へ接続済み。画像URLキャッシュと未削除の一時下書きIDを原子的に保存し、次回画像投稿時に回収する。統合後の実投稿確認待ち
+- **Blogger の画像**: 内部画像ストアへのブラウザアップロードを既存API投稿へ接続済み。画像URLキャッシュと未削除の一時下書きIDを原子的に保存し、次回画像投稿時に回収する。画像付き実投稿を継続確認済み
 
-## 9. 実装結果（2026-08-04）
+## 9. 実装結果
 
-- Phase 2a Bluesky: 実装・画像付き実投稿完了
-- Phase 2b Tumblr: NPF multipart のバイナリ安全化、レスポンス形式修正、トークン自動更新まで完了
-- Phase 2c Blogger: OAuth refresh、HTML本文、当初の画像ホットリンクで実投稿完了。2026-08-11に内部画像ストアとの混合方式を追加し、統合後の実投稿確認待ち
-- Phase 2d X: OAuth1.0a、v2メディアアップロード、ツイート生成まで完成し認証通過。API課金は行わず、ブラウザ投稿へ切替
+- Bluesky: 実装・画像付き実投稿完了。サイズ超過画像は上限内へ縮小する
+- Tumblr: NPF multipart のバイナリ安全化、レスポンス形式修正、トークン自動更新まで完了
+- Blogger: OAuth refresh、HTML本文、内部画像ストアとの混合方式を実装し、画像付き実投稿を確認済み
+- X: OAuth1.0a、v2メディアアップロード、ツイート生成まで完成し認証通過。API課金は行わず、公式ルール上ブラウザ自動化もしない
 - Fedibird の写真付き投稿から Blogger / Bluesky への一気通貫を実画像で確認済み

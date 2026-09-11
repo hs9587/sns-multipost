@@ -1,7 +1,7 @@
 # sns-multipost 設計ドキュメント
 
 - 日付: 2026-07-19
-- 状態: ユーザー承認済み設計。Phase 1・2 実装完了、Phase 3 調査着手（2026-08-09 現在）
+- 状態: 基盤と自動投稿対象を実装し、継続運用で確認済み
 - リポジトリ: GitHub `hs9587/sns-multipost`（パブリック・新規作成）
 
 ## 1. 目的と背景
@@ -138,19 +138,21 @@ sns-multipost/
 - API 組の移設手順（SETUP.md に記載): git clone → `bundle install` → config.yml 記入 → `bin/watch --sync-only` → schtasks でスケジューラ登録（bin/watch の直後に bin/run_queue）
 - Blogger画像、mixi、mixi2、Jotterのブラウザ操作は実装済み。移設先では専用Chromeのログイン状態を新規作成し、プロファイルを別機体からコピーしない
 
-## 13. スコープ外（次ステップ候補）
+## 13. 今後の候補
 
-- Jotter.me の画像投稿（DEN の用意が必要。DEN 残高は送金・振替機能で用意）
 - 出先対応のトリガ差し替え（Fedibird 監視の常駐化等）
 - タイトル判定の LLM ハイブリッド（c案）
 - note への投稿（対象外と決定済み）
+- X / Instagram / Facebook向け手動引き渡しの優先度と範囲の再検討
 
-## 14. 実装状況と残課題（2026-08-09）
+## 14. 現在の実装状況
 
-- Phase 1: ファイルキュー、Fedibird 監視・投稿、タイトル辞書、再試行まで完了
-- Phase 2: Bluesky / Tumblr / Blogger / X API を実装。X 以外はライブ投稿済み。X API は認証通過後に 402 `credits depleted` を確認。APIコードは保管する
+- ファイルキュー、Fedibird監視・投稿、タイトル辞書、失敗履歴、明示的な再試行まで実装・運用確認済み
+- Fedibird / Bluesky / Tumblr / Blogger / ThreadsはAPI経路で実投稿確認済み。X APIは認証通過後に402 `credits depleted` を確認し、課金せずコードだけを保管する
 - Tumblr: ローテーション型 refresh token の自動更新と `state/tumblr_token.json` への原子的保存を実装済み
-- Blogger: 本文投稿はAPIのまま、画像は専用Chromeで内部画像ストアへ保存する混合方式を実装。APIで作る非公開の一時下書きは画像URL取得後に削除し、URLキャッシュと未削除下書き記録を `state/blogger_image_store.json` に保持する。統合後の実投稿確認待ち
-- Phase 3: mixi2・mixi・Jotter.meは実投稿まで完了。Threads単画像もFedibird最新画像経路で実投稿確認済み。Instagram / Facebookは自動投稿せず、Xも規約上ブラウザ自動化しない
-- 運用: Windows タスクスケジューラでの定期実行を確認済み。`--sync-only` で過去投稿をキューに積まず基準合わせでき、`--rewind COUNT` でキューを作らず直近投稿を再検出対象へ戻せる
-- ハードニング候補: HTTPタイムアウト、重複投稿抑止、排他制御は実装済み。残件はdone/failed/state/mediaとChromeキャッシュの清掃方針
+- Blogger: 本文はAPI、画像は専用Chromeで内部画像ストアへ保存する混合方式。非公開の一時下書きは画像URL取得後に削除し、URLキャッシュと未削除下書き記録を `state/blogger_image_store.json` に保持する。画像付き実投稿を継続確認済み
+- mixi2ポスト、mixiつぶやき、Jotter.me公開テキスト・単画像投稿は専用Chromeで実投稿確認済み。Jotterは専用Browser IDとDEN検証を運用する
+- Threadsはテキスト、単画像、複数画像を実投稿確認済み。通常運用はInstagram / Facebookからの波及とし、API経路は予備として維持する
+- Instagram / Facebookは自動投稿せず、Xも公式ルール上ブラウザ自動化しない
+- Windowsタスクスケジューラによる定期実行、HTTP時間上限、安全な通信再試行、排他制御、結果不明の分離を確認済み
+- `cleanup --dry-run` / `cleanup --apply` で保護対象を除く古いジョブ、未参照画像、失敗画像、再生成可能なChromeキャッシュを確認・清掃できる

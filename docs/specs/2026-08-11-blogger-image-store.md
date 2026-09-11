@@ -40,7 +40,7 @@ ruby spike/blogger_image_upload.rb PATH_TO_IMAGE
 
 ## 通常投稿への接続
 
-- Blogger APIで非公開の一時下書きを作り、専用Chromeで画像を挿入する。
+- Blogger APIで非公開の一時下書きを作り、専用Chromeから画像を内部ストアへアップロードする。
 - `/s320/` の表示用URLを `/s0/` に変換し、公開画像として取得できることを確認する。
 - URL取得後に一時下書きをBlogger APIで削除する。
 - 画像SHA-256と元画像URLをキーに `state/blogger_image_store.json` へURLを保存する。
