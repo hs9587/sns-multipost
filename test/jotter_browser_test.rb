@@ -292,6 +292,14 @@ class JotterBrowserTest < Minitest::Test
     assert_includes script, "timestamp >= notBefore"
   end
 
+  def test_post_url_requires_a_recent_publication_time_before_opening_candidate
+    script = SnsMultipost::JotterBrowser::POST_URL_JS
+
+    assert_includes script, "time[datetime]"
+    assert_includes script, "timestamp >= notBefore"
+    assert_includes script, "unique.length === 1"
+  end
+
   def test_existing_urls_include_current_individual_post
     script = SnsMultipost::JotterBrowser::POST_URLS_JS
 

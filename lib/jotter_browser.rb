@@ -110,20 +110,43 @@ module SnsMultipost
 
     POST_URL_JS = <<~'JS'.freeze
       (() => {
-        const expected = arguments[0];
+        const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+        const expected = normalize(arguments[0]);
         const excluded = new Set(arguments[1] || []);
-        if (location.pathname.includes('/jot/') && location.hash && !excluded.has(location.href)) {
+        const notBefore = Date.parse(arguments[2] || '');
+        const timestamps = (root) => {
+          const values = Array.from(root.querySelectorAll('time[datetime]'))
+            .map((node) => Date.parse(node.getAttribute('datetime')))
+            .filter(Number.isFinite);
+          const text = root.innerText || root.textContent || '';
+          for (const match of text.matchAll(
+            /(\d{4})年(\d{1,2})月(\d{1,2})日(?:\([^)]*\))?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/g
+          )) {
+            values.push(new Date(
+              Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+              Number(match[4]), Number(match[5]), Number(match[6] || 0)
+            ).getTime());
+          }
+          return values;
+        };
+        const recent = (root) => Number.isFinite(notBefore) &&
+          timestamps(root).some((timestamp) => timestamp >= notBefore);
+        const bodyText = normalize(document.body?.innerText);
+        if (location.pathname.includes('/jot/') && location.hash &&
+            !excluded.has(location.href) && bodyText.includes(expected) && recent(document.body)) {
           return location.href;
         }
         const paragraphs = Array.from(document.querySelectorAll('p'))
-          .filter((body) => body.textContent.includes(expected));
+          .filter((body) => normalize(body.textContent).includes(expected));
         for (const body of paragraphs) {
           let scope = body;
           for (let i = 0; i < 5 && scope; i += 1, scope = scope.parentElement) {
-            const link = scope.querySelector && scope.querySelector('a[href*="/ja-JP/jot/#"]');
-            if (!link) continue;
-            const url = new URL(link.getAttribute('href'), location.origin).href;
-            if (!excluded.has(url)) return url;
+            const links = scope.querySelectorAll && scope.querySelectorAll('a[href*="/ja-JP/jot/#"]');
+            const urls = Array.from(links || [])
+              .map((link) => new URL(link.getAttribute('href'), location.origin).href)
+              .filter((url) => !excluded.has(url));
+            const unique = Array.from(new Set(urls));
+            if (unique.length === 1 && recent(scope)) return unique[0];
           }
         }
         return null;
@@ -428,7 +451,7 @@ module SnsMultipost
       expected = text[0, 40]
       url = wait_for(timeout: @confirmation_timeout) do
         click_post_confirmations
-        safe_evaluate(POST_URL_JS, expected, existing_urls)
+        safe_evaluate(POST_URL_JS, expected, existing_urls, verification_not_before)
       end
       raise "Jotterの新しい公開投稿を確認できません" unless url
 
