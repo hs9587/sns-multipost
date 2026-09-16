@@ -521,7 +521,30 @@ module SnsMultipost
 
       unverified = den_number(state.dig("balances", "unverified"))
       if available + unverified < required_den
-        raise "JotterのDENが不足しています（必要#{required_den}、利用可能#{available}、未検証#{unverified}）"
+        needs_update = den_number(state.dig("balances", "needsUpdate"))
+        scheduled = den_number(state.dig("balances", "scheduled"))
+        reported_total = den_number(state.dig("balances", "total"))
+        categorized_total = available + unverified + needs_update + scheduled
+        total = [reported_total, categorized_total].max
+        breakdown = "必要#{required_den}、利用可能#{available}、未検証#{unverified}、" \
+                    "要更新#{needs_update}、入金予定#{scheduled}、合計#{total}"
+
+        if available + unverified + needs_update >= required_den
+          raise "Jotterの利用可能DENが不足しています（#{breakdown}）。" \
+                "要更新DENが利用可能になるまでjotter_wallet_holdで専用Chromeを開いて待つか、" \
+                "時間がなければ振り替えてください"
+        end
+        if categorized_total >= required_den && scheduled.positive?
+          raise "Jotterの利用可能DENが不足しています（#{breakdown}）。" \
+                "入金予定DENの反映を待つか、jotter_wallet_holdで振り替えてください"
+        end
+        if total >= required_den
+          raise "Jotterの利用可能DENが不足しています（#{breakdown}）。" \
+                "jotter_wallet_holdで専用Chromeを開き、利用可能への更新を待ってください"
+        end
+
+        raise "JotterのDENが不足しています（#{breakdown}）。" \
+              "jotter_wallet_holdで振り替えてください"
       end
 
       before = state

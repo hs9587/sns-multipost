@@ -352,6 +352,39 @@ class JotterBrowserTest < Minitest::Test
     assert_equal "270", result.dig("after", "balances", "available")
   end
 
+  def test_den_shortage_recommends_waiting_when_needs_update_can_cover_cost
+    state = {
+      "balances" => {
+        "available" => "10", "unverified" => "0", "needsUpdate" => "8,835",
+        "scheduled" => "0", "total" => "8,845"
+      }
+    }
+
+    error = assert_raises(RuntimeError) do
+      client(FakeBrowser.new).send(:verify_wallet_den, state, required_den: 90)
+    end
+
+    assert_match(/要更新8835/, error.message)
+    assert_match(/jotter_wallet_hold/, error.message)
+    assert_match(/開いて待つ/, error.message)
+  end
+
+  def test_den_shortage_recommends_transfer_when_total_is_insufficient
+    state = {
+      "balances" => {
+        "available" => "10", "unverified" => "0", "needsUpdate" => "0",
+        "scheduled" => "0", "total" => "10"
+      }
+    }
+
+    error = assert_raises(RuntimeError) do
+      client(FakeBrowser.new).send(:verify_wallet_den, state, required_den: 90)
+    end
+
+    assert_match(/合計10/, error.message)
+    assert_match(/振り替えてください/, error.message)
+  end
+
   def test_media_smoke_selects_one_image_without_posting
     Dir.mktmpdir do |dir|
       path = File.join(dir, "one.png")
