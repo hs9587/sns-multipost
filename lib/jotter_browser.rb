@@ -675,6 +675,11 @@ module SnsMultipost
           status("Jotter: 復元完了後のホーム画面を確認")
         else
           status("Jotter: ログイン済みの別画面を確認（ホーム復帰を試行）")
+          unless return_to_home
+            status("Jotter: ログイン済み画面からホーム復帰に失敗")
+            next
+          end
+          status("Jotter: ログイン済み画面からホームを再表示")
         end
         @sleeper.call(1)
         next unless correct_account?

@@ -35,8 +35,9 @@ class JotterBrowserTest < Minitest::Test
                 :confirm_clicks
 
     def initialize(wrong_account_once: false, confirm_post: true, hide_browser_id: false,
-                   home_requires_reset: false, confirmation_steps: 1, post_detail: true,
-                   stale_actions: [], savepoint_account_panel: false)
+                    home_requires_reset: false, confirmation_steps: 1, post_detail: true,
+                    stale_actions: [], savepoint_account_panel: false,
+                    account_requires_home_reset: false)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
@@ -45,6 +46,7 @@ class JotterBrowserTest < Minitest::Test
       @post_detail = post_detail
       @stale_actions = stale_actions.dup
       @savepoint_account_panel = savepoint_account_panel
+      @account_requires_home_reset = account_requires_home_reset
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -77,6 +79,7 @@ class JotterBrowserTest < Minitest::Test
       when SnsMultipost::JotterBrowser::OPEN_ACCOUNT_JS
         @account_open = true
       when SnsMultipost::JotterBrowser::ACCOUNT_NAME_JS
+        return nil if @account_requires_home_reset && !@home_reset
         return nil unless @account_open || @savepoint_account_panel
         if @wrong_account_once && @goto_count < 2
           "temporary"
@@ -217,7 +220,10 @@ class JotterBrowserTest < Minitest::Test
   end
 
   def test_smoke_recovers_when_savepoint_opens_authenticated_account_panel
-    browser = FakeBrowser.new(savepoint_account_panel: true)
+    browser = FakeBrowser.new(
+      savepoint_account_panel: true,
+      home_requires_reset: true,
+      account_requires_home_reset: true)
     messages = []
     jotter = SnsMultipost::JotterBrowser.new(
       savepoint_url: "https://secret.example/savepoint",
@@ -235,6 +241,7 @@ class JotterBrowserTest < Minitest::Test
 
     assert_equal true, result["hasEditor"]
     assert_includes messages, "Jotter: ログイン済みの別画面を確認（ホーム復帰を試行）"
+    assert_includes messages, "Jotter: ログイン済み画面からホームを再表示"
     assert_includes messages, "Jotter: 期待するアカウント表示名と一致"
   end
 
