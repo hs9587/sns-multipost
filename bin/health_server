@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "health_server"
+
+root = File.expand_path("..", __dir__)
+selector = nil
+port = 8765
+task_name = "sns-multipost"
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/health_server --bind BIND [options]",
+  description: "sns-multipostの状態を表示する読み取り専用WEBrickサーバーを前景で実行します。",
+  examples: ["ruby bin/health_server --bind home", "ruby bin/health_server --bind nebula",
+             "ruby bin/health_server --bind 192.168.1.20 --port 8765"],
+  notes: ["通常は ruby bin/health から起動・登録します。",
+          "BINDはhome、lan、nebula、またはこのPCに割り当て済みのIPv4です。",
+          "config.yml、認証情報、投稿本文、画像は読み取りも公開もしません。",
+          "ファイアウォール設定は変更せず、インターネットへ直接公開しないでください。"]
+) do |opts|
+  opts.on("--bind BIND", "待受先: home、lan、nebula、またはIPv4") { |value| selector = value }
+  opts.on("--port N", Integer, "待受ポート（既定: 8765）") { |value| port = value }
+  opts.on("--task NAME", "表示する投稿タスク名（既定: sns-multipost）") { |value| task_name = value }
+end
+SnsMultipost::Cli.parse!(parser)
+SnsMultipost::Cli.usage_error(parser, "--bindを指定してください") if selector.to_s.strip.empty?
+SnsMultipost::Cli.usage_error(parser, "余分な引数は指定できません") unless ARGV.empty?
+
+begin
+  server = SnsMultipost::HealthServer.new(
+    root: root, selector: selector, port: port, task_name: task_name)
+  puts "監視サーバーを起動: http://#{server.network.fetch('address')}:#{server.port}/"
+  puts "待受: #{server.network.fetch('kind')} / #{server.network.fetch('interface')}"
+  server.start
+rescue Interrupt
+  exit 0
+rescue StandardError => e
+  warn e.message
+  exit 1
+end

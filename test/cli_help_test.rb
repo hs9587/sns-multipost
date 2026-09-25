@@ -5,7 +5,7 @@ require "cli"
 
 class CliHelpTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  COMMANDS = %w[browser_login cleanup dryrun_titles failed_jobs jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task task_run threads_auth watch whoami].freeze
+  COMMANDS = %w[browser_login cleanup dryrun_titles failed_jobs health health_server jotter_media_smoke jotter_wallet_hold jotter_wallet_smoke jotter_wallet_verify mixi2_smoke post retry run_queue task task_run threads_auth watch whoami].freeze
 
   def run_cli(command, *args)
     Open3.capture3(
@@ -88,6 +88,17 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "watchが失敗しても"
     assert_includes stdout, "終了コード1"
     assert_includes stdout, "自動retryは行いません"
+  end
+
+  def test_health_help_explains_read_only_server_and_bind_choices
+    stdout, _stderr, status = run_cli("health", "--help")
+    assert status.success?
+    assert_includes stdout, "start home"
+    assert_includes stdout, "start nebula"
+    assert_includes stdout, "register"
+    assert_includes stdout, "unregister"
+    assert_includes stdout, "config.ymlの読取り"
+    assert_includes stdout, "ファイアウォール変更"
   end
 
   def test_task_rejects_invalid_action_before_changing_task

@@ -1,0 +1,88 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "cli"
+require "health_control"
+require "health_runtime"
+
+root = File.expand_path("..", __dir__)
+port = 8765
+task_name = SnsMultipost::HealthControl::TASK_NAME
+parser = SnsMultipost::Cli.parser(
+  banner: "Usage: ruby bin/health [options] [ACTION] [BIND]",
+  description: "sns-multipostの読み取り専用監視サーバーを確認、起動、停止、Windowsへ登録・解除します。",
+  examples: ["ruby bin/health", "ruby bin/health start home", "ruby bin/health start nebula",
+             "ruby bin/health start 192.168.1.20", "ruby bin/health stop",
+             "ruby bin/health register nebula", "ruby bin/health unregister"],
+  notes: ["ACTIONを省略すると状態を読み取るだけです。",
+          "startは今回だけ起動し、registerはログオン時起動のWindowsタスクを登録して直ちに起動します。",
+          "BINDはhome、lan、nebula、またはこのPCに割り当て済みのIPv4です。",
+          "stopは登録を残して停止し、unregisterは監視サーバー用タスクだけを解除します。",
+          "投稿、retry、config.ymlの読取り、ファイアウォール変更は行いません。",
+          "インターネットへ直接公開しないでください。"]
+) do |opts|
+  opts.on("--port N", Integer, "待受ポート（既定: 8765）") { |value| port = value }
+  opts.on("--task NAME", "監視サーバー用Windowsタスク名") { |value| task_name = value }
+end
+SnsMultipost::Cli.parse!(parser)
+
+action = ARGV.shift || "status"
+selector = ARGV.shift
+actions = %w[status start stop restart register unregister]
+unless actions.include?(action) && ARGV.empty?
+  SnsMultipost::Cli.usage_error(
+    parser, "ACTIONはstatus、start、stop、restart、register、unregisterのいずれかです")
+end
+if %w[start register].include?(action) && selector.to_s.strip.empty?
+  SnsMultipost::Cli.usage_error(parser, "#{action}にはBINDを指定してください")
+end
+if %w[status stop unregister].include?(action) && selector
+  SnsMultipost::Cli.usage_error(parser, "#{action}にはBINDを指定しません")
+end
+
+control = SnsMultipost::HealthControl.new(root: root, task_name: task_name)
+begin
+  case action
+  when "start"
+    state = control.start(selector: selector, port: port)
+    puts "起動: http://#{state.fetch('resolved_ip')}:#{state.fetch('port')}/"
+  when "stop"
+    puts(control.stop ? "停止しました" : "監視サーバーは停止中です")
+  when "restart"
+    previous = SnsMultipost::HealthRuntime.load(root)
+    if control.registered?
+      SnsMultipost::Cli.usage_error(
+        parser, "登録済みWindowsタスクのrestartにはBINDを指定しません。変更はregisterを再実行してください") if selector
+      control.stop
+      state = control.start_registered
+    else
+      selected = selector || previous["selector"]
+      SnsMultipost::Cli.usage_error(parser, "restartにはBINDを指定してください") if selected.to_s.empty?
+      selected_port = selector ? port : previous.fetch("port", port)
+      control.stop
+      state = control.start(selector: selected, port: selected_port)
+    end
+    puts "再起動: http://#{state.fetch('resolved_ip')}:#{state.fetch('port')}/"
+  when "register"
+    control.stop if SnsMultipost::HealthRuntime.reachable?(SnsMultipost::HealthRuntime.load(root))
+    control.register(selector: selector, port: port)
+    puts "登録・起動: #{task_name}（#{selector}:#{port}）"
+  when "unregister"
+    if control.registered?
+      control.unregister
+      puts "解除: #{task_name}"
+    else
+      puts "監視サーバー用Windowsタスクは未登録です"
+    end
+  end
+
+  state = SnsMultipost::HealthRuntime.load(root)
+  puts SnsMultipost::HealthRuntime.summary(root)
+  registration = control.registration
+  puts "Windowsタスク: #{registration ? registration.fetch('State') : '未登録'}"
+  if %w[start register restart].include?(action)
+    puts "注意: Windowsファイアウォールは変更していません。家庭内LANまたは既存VPN内だけで許可してください。"
+  end
+rescue StandardError => e
+  warn e.message
+  exit 1
+end

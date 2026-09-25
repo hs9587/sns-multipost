@@ -4,6 +4,7 @@ require "cli"
 require "job_history"
 require "task_status"
 require "task_runner"
+require "health_runtime"
 require "rbconfig"
 
 task_name = "sns-multipost"
@@ -74,6 +75,7 @@ begin
   history = SnsMultipost::JobHistory.snapshot(
     done_directory: File.join(root, "done"), failed_directory: File.join(root, "failed"))
   puts SnsMultipost::JobHistory.format_summary(history)
+  puts SnsMultipost::HealthRuntime.summary(root)
 rescue StandardError => e
   warn e.message
   exit 1

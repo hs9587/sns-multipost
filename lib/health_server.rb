@@ -1,0 +1,152 @@
+require "cgi"
+require "fileutils"
+require "json"
+require "time"
+require "webrick"
+require_relative "health_network"
+require_relative "health_runtime"
+require_relative "health_snapshot"
+
+module SnsMultipost
+  class HealthServer
+    attr_reader :network, :port
+
+    def initialize(root:, selector:, port: 8765, task_name: "sns-multipost",
+                   network_resolver: HealthNetwork.method(:resolve), clock: -> { Time.now })
+      @root = File.expand_path(root)
+      @selector = selector
+      @port = Integer(port)
+      raise "ポートは1～65535で指定してください" unless @port.between?(1, 65_535)
+
+      @clock = clock
+      @network = network_resolver.call(selector)
+      @snapshot = HealthSnapshot.new(root: @root, task_name: task_name, clock: clock)
+      @started_at = clock.call
+    rescue ArgumentError, TypeError
+      raise "ポートは1～65535で指定してください"
+    end
+
+    def start
+      FileUtils.mkdir_p(File.join(@root, "logs"))
+      logger = WEBrick::Log.new(File.join(@root, "logs", "health.log"), WEBrick::Log::INFO)
+      server = WEBrick::HTTPServer.new(
+        BindAddress: network.fetch("address"), Port: port,
+        AccessLog: [], Logger: logger,
+        ServerSoftware: "sns-multipost-health")
+      state = runtime_state
+      HealthRuntime.save(@root, state)
+      server.mount_proc("/") { |request, response| respond(request, response, state) }
+      %w[INT TERM].each { |signal| trap(signal) { server.shutdown } }
+      server.start
+    ensure
+      HealthRuntime.remove(@root, pid: Process.pid)
+    end
+
+    def runtime_state
+      {
+        "selector" => @selector,
+        "kind" => network.fetch("kind"),
+        "interface" => network.fetch("interface"),
+        "resolved_ip" => network.fetch("address"),
+        "port" => port,
+        "pid" => Process.pid,
+        "started_at" => @started_at.iso8601
+      }
+    end
+
+    private
+
+    def respond(request, response, state)
+      set_headers(response)
+      unless %w[GET HEAD].include?(request.request_method)
+        response.status = 405
+        response["Allow"] = "GET, HEAD"
+        response.body = "Method Not Allowed\n"
+        return
+      end
+
+      snapshot = @snapshot.build(server_state: state)
+      case request.path
+      when "/"
+        response["Content-Type"] = "text/html; charset=utf-8"
+        response.body = html(snapshot)
+      when "/health.json"
+        response["Content-Type"] = "application/json; charset=utf-8"
+        response.body = JSON.pretty_generate(snapshot) + "\n"
+      else
+        response.status = 404
+        response["Content-Type"] = "text/plain; charset=utf-8"
+        response.body = "Not Found\n"
+      end
+    rescue StandardError => e
+      response.status = 500
+      response["Content-Type"] = "application/json; charset=utf-8"
+      response.body = JSON.generate("status" => "error", "error" => e.message) + "\n"
+    end
+
+    def set_headers(response)
+      response["Cache-Control"] = "no-store"
+      response["X-Content-Type-Options"] = "nosniff"
+      response["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+      response["Referrer-Policy"] = "no-referrer"
+    end
+
+    def html(snapshot)
+      status = snapshot.fetch("status")
+      task = snapshot.fetch("task")
+      runner = snapshot.fetch("runner")
+      jobs = snapshot.fetch("jobs")
+      server = snapshot.fetch("server")
+      failed = jobs.fetch("recent_failed").map { |name| "<li>#{h(name)}</li>" }.join
+      last_run = runner["last_run"] || {}
+      last_failure = runner["last_failure"] || {}
+      <<~HTML
+        <!doctype html>
+        <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+        <title>sns-multipost 状態</title>
+        <style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:2rem auto;padding:0 1rem;line-height:1.6}dt{font-weight:700}dd{margin:0 0 .5rem 1rem}.ok{color:#087830}.failed,.error{color:#b42318}.disabled{color:#8a5700}code{word-break:break-all}</style>
+        </head><body>
+        <h1>sns-multipost 状態</h1>
+        <p class="#{h(status)}"><strong>#{h(status_label(status))}</strong></p>
+        <dl>
+          <dt>サーバー時刻</dt><dd>#{h(format_time(snapshot["server_time"]))}</dd>
+          <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
+          <dt>起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
+          <dt>投稿タスク</dt><dd>#{h(task["State"] || task["error"] || "不明")}</dd>
+          <dt>前回実行</dt><dd>#{h(format_time(task["LastRunTime"]))}</dd>
+          <dt>次回実行</dt><dd>#{h(format_time(task["NextRunTime"]))}</dd>
+          <dt>定期実行ラッパー</dt><dd>#{h(format_time(last_run["at"]))} / watch=#{h(last_run["watch_exit"])} run_queue=#{h(last_run["run_queue_exit"])} overall=#{h(last_run["overall_exit"])}</dd>
+          <dt>最後に記録した異常</dt><dd>#{h(format_time(last_failure["at"]))}#{format_failure(last_failure)}</dd>
+          <dt>done最新</dt><dd>#{h(jobs["latest_done"] || "なし")}</dd>
+          <dt>最近のfailed</dt><dd>#{h(jobs["recent_failed_count"])}件</dd>
+        </dl>
+        #{failed.empty? ? "" : "<ul>#{failed}</ul>"}
+        <p><a href="/health.json">JSON</a></p>
+        </body></html>
+      HTML
+    end
+
+    def status_label(status)
+      { "ok" => "正常", "disabled" => "投稿タスク一時停止", "failed" => "確認が必要", "error" => "状態取得エラー" }.fetch(status, status)
+    end
+
+    def format_failure(failure)
+      return "" if failure.empty?
+
+      " / watch=#{h(failure['watch_exit'])} run_queue=#{h(failure['run_queue_exit'])} " \
+        "overall=#{h(failure['overall_exit'])}"
+    end
+
+    def format_time(value)
+      return "なし" if value.nil? || value.to_s.empty?
+
+      Time.iso8601(value.to_s).strftime("%Y年%-m月%-d日 %-H:%M:%S")
+    rescue ArgumentError
+      value.to_s
+    end
+
+    def h(value)
+      CGI.escapeHTML(value.to_s)
+    end
+  end
+end

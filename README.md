@@ -153,6 +153,33 @@ Jotterは複数画像を指定しても先頭1枚だけを使う。画像選択�
 [Jotter画像投稿とDEN運用](docs/specs/2026-08-15-jotter-image-den.md) を参照。
 `dry_run: true` でもキューは `done/` へ移るため、本番投稿用ジョブの事前確認には使わないこと。
 
+### 読み取り専用の状態確認サーバー（任意）
+
+別のPCやスマートフォンから、このPCと定期投稿タスクが動いているか確認するため、WEBrickによる
+小さな読み取り専用サーバーを任意で起動できる。投稿、retry、タスク切替、任意ファイル取得は行わず、
+`config.yml`、認証情報、投稿本文、画像を読み取り・表示しない。
+
+    ruby bin/health start home
+    ruby bin/health start nebula
+    ruby bin/health start 192.168.1.20
+    ruby bin/health stop
+
+既定ポートは8765。`home`（`lan`も同義）は既定経路を持つプライベートLAN、`nebula` は既存の
+Nebulaアダプターを起動時に探索する。IP直指定は、このPCに実際に割り当てられたIPv4だけを許可する。
+`0.0.0.0` は許可しない。Nebulaは任意の対応例であり、インストール、証明書、lighthouse設定は
+sns-multipostの範囲外。他のVPNも割当済みIPの直接指定で利用できる。
+
+常時起動する場合は、投稿タスクとは別の `sns-multipost-health` Windowsタスクを登録する。
+
+    ruby bin/health register nebula
+    ruby bin/health
+    ruby bin/health unregister
+
+状態ページは `/`、JSONは `/health.json`。Windowsファイアウォールは自動変更しない。
+家庭内LANまたは既存VPN内だけで利用し、ルーターのポート転送などでインターネットへ直接公開しない。
+詳しい設計と安全上の境界は
+[読み取り専用状態確認サーバー](docs/specs/2026-09-26-health-server.md) を参照。
+
 ## ロードマップ
 
 1. X / Instagram / Facebook向け手動引き渡しを含む残件の順番を再検討する

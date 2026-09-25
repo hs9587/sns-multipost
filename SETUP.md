@@ -212,3 +212,35 @@ Fedibird の新着を定期的に検出して各 SNS へ自動展開する。常
 - `bin/run_queue` と `bin/retry` は共通の排他ロックを使う。一方が投稿処理中なら、もう一方は二重投稿を避けて `skip` し、ジョブを移動しない
 - 自己投稿は state/self_posted.txt で除外されるためループしない
 - トークンが期限切れになっても、refresh 対応済みの SNS（Blogger, Tumblr）は自動更新される
+
+## 別端末からの状態確認（任意）
+
+WEBrickの読み取り専用状態確認サーバーは、投稿用の定期タスクとは独立している。
+一時的な動作確認では、待受先を指定して起動する。
+
+    ruby bin\health start home
+    ruby bin\health start nebula
+    ruby bin\health start 192.168.1.20
+
+`home` は有効な家庭内LANを探し、Windowsのネットワーク種別がプライベートの場合だけ起動する。
+`nebula` は既に導入・接続されているNebulaアダプターのIPv4を起動時に取得する。
+IP直指定は、このPCへ割り当て済みのIPv4だけを受け付ける。
+
+常時起動用タスクを登録する場合:
+
+    ruby bin\health register nebula
+
+タスク名は `sns-multipost-health`。ログオン時に起動し、異常終了時は最大3回再起動する。
+確認、停止、再起動、解除:
+
+    ruby bin\health
+    ruby bin\health stop
+    ruby bin\health restart
+    ruby bin\health unregister
+
+`bin/task` は投稿タスクを管理し、末尾に監視サーバーの稼働状態を一行だけ表示する。
+詳しい監視サーバー情報は `bin/health` で確認する。
+
+Windowsファイアウォールは自動変更しない。家庭内LANではプライベートプロファイルかつ
+ローカルサブネット限定、VPNでは使用する仮想アダプターまたはアドレス範囲限定でTCP 8765を許可する。
+外出先から利用するときも、ルーターでTCP 8765をインターネットへ直接転送せず、既存VPNを使う。
