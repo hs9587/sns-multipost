@@ -28,4 +28,11 @@ class HealthRuntimeTest < Minitest::Test
       assert_includes output, "home 127.0.0.1:1"
     end
   end
+
+  def test_reachable_requires_the_recorded_process_to_exist
+    refute SnsMultipost::HealthRuntime.reachable?({
+      "resolved_ip" => "127.0.0.1", "port" => 1, "pid" => 999_999
+    })
+    assert SnsMultipost::HealthRuntime.process_alive?(Process.pid)
+  end
 end

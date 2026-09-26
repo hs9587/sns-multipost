@@ -31,6 +31,15 @@ module SnsMultipost
     end
 
     def reachable?(state, timeout: 0.5)
+      pid = Integer(state["pid"])
+      return false unless process_alive?(pid)
+
+      port_open?(state, timeout: timeout)
+    rescue ArgumentError, TypeError
+      false
+    end
+
+    def port_open?(state, timeout: 0.5)
       address = state["resolved_ip"].to_s
       port = Integer(state["port"])
       return false if address.empty?
@@ -39,6 +48,15 @@ module SnsMultipost
       true
     rescue ArgumentError, TypeError, SystemCallError, IOError
       false
+    end
+
+    def process_alive?(pid)
+      Process.kill(0, Integer(pid))
+      true
+    rescue Errno::ESRCH, ArgumentError, TypeError
+      false
+    rescue Errno::EPERM
+      true
     end
 
     def summary(root)

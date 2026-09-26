@@ -21,8 +21,12 @@ module SnsMultipost
     def start(selector:, port: 8765)
       raise "監視サーバーはすでに稼働しています" if HealthRuntime.reachable?(HealthRuntime.load(@root))
 
-      HealthNetwork.resolve(selector)
+      network = HealthNetwork.resolve(selector)
       selected_port = validate_port(port)
+      target = { "resolved_ip" => network.fetch("address"), "port" => selected_port }
+      if HealthRuntime.port_open?(target)
+        raise "#{network.fetch('address')}:#{selected_port}は別のプロセスが使用中です"
+      end
       FileUtils.mkdir_p(File.join(@root, "logs"))
       log = File.open(File.join(@root, "logs", "health-launch.log"), "ab")
       command = [@ruby_path, server_path, "--bind", selector, "--port", selected_port.to_s]
