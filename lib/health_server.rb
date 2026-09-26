@@ -98,6 +98,7 @@ module SnsMultipost
       jobs = snapshot.fetch("jobs")
       server = snapshot.fetch("server")
       failed = jobs.fetch("recent_failed").map { |name| "<li>#{h(name)}</li>" }.join
+      failed_count = jobs.fetch("recent_failed_count")
       last_run = runner["last_run"] || {}
       last_failure = runner["last_failure"] || {}
       <<~HTML
@@ -107,7 +108,7 @@ module SnsMultipost
         <style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:2rem auto;padding:0 1rem;line-height:1.6}dt{font-weight:700}dd{margin:0 0 .5rem 1rem}.ok{color:#087830}.failed,.error{color:#b42318}.disabled{color:#8a5700}code{word-break:break-all}</style>
         </head><body>
         <h1>sns-multipost 状態</h1>
-        <p class="#{h(status)}"><strong>#{h(status_label(status))}</strong></p>
+        <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>
         <dl>
           <dt>サーバー時刻</dt><dd>#{h(format_time(snapshot["server_time"]))}</dd>
           <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
@@ -121,13 +122,21 @@ module SnsMultipost
           <dt>最近のfailed</dt><dd>#{h(jobs["recent_failed_count"])}件</dd>
         </dl>
         #{failed.empty? ? "" : "<ul>#{failed}</ul>"}
+        #{failed_count.positive? ? "<p>再投稿する場合は、重複を避けるため投稿済みでないことを確認してから<code>retry</code>してください。</p>" : ""}
         <p><a href="/health.json">JSON</a></p>
         </body></html>
       HTML
     end
 
-    def status_label(status)
-      { "ok" => "正常", "disabled" => "投稿タスク一時停止", "failed" => "確認が必要", "error" => "状態取得エラー" }.fetch(status, status)
+    def status_label(status, failed_count: 0)
+      return "未処理の失敗記録があります（#{failed_count}件）" if failed_count.positive?
+
+      {
+        "ok" => "正常",
+        "disabled" => "投稿タスク一時停止",
+        "failed" => "定期実行で異常を記録しました",
+        "error" => "状態取得エラー"
+      }.fetch(status, status)
     end
 
     def format_failure(failure)

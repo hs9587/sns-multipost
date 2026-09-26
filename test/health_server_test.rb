@@ -55,4 +55,20 @@ class HealthServerTest < Minitest::Test
     assert_equal 404, hidden.status
     refute_includes hidden.body, "config.yml"
   end
+
+  def test_explains_unresolved_failed_jobs_without_assuming_retry
+    @snapshot["status"] = "failed"
+    @snapshot["jobs"] = {
+      "latest_done" => "20260927-065502_tumblr_ok.json",
+      "recent_failed_count" => 1,
+      "recent_failed" => ["20260927-065502_jotter_failed.json"]
+    }
+
+    html = response_for("GET", "/").body
+
+    assert_includes html, "未処理の失敗記録があります（1件）"
+    assert_includes html, "再投稿する場合は、重複を避けるため投稿済みでないことを確認してから"
+    assert_includes html, "<code>retry</code>してください。"
+    refute_includes html, "確認が必要"
+  end
 end
