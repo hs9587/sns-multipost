@@ -11,7 +11,8 @@ module SnsMultipost
       @root = File.expand_path(root)
       @task_name = task_name
       @clock = clock
-      @task_query = task_query || -> { TaskStatus.query(@task_name) }
+      @task_query = task_query || -> { TaskStatus.query(@task_name, timeout: task_timeout) }
+      @custom_task_query = !task_query.nil?
       @task_timeout = task_timeout
       @task_mutex = Mutex.new
     end
@@ -41,8 +42,12 @@ module SnsMultipost
     private
 
     def safe_task
-      task = Timeout.timeout(@task_timeout) do
-        @task_mutex.synchronize { @task_query.call }
+      task = @task_mutex.synchronize do
+        if @custom_task_query
+          Timeout.timeout(@task_timeout) { @task_query.call }
+        else
+          @task_query.call
+        end
       end.dup
       task["NextRunTime"] = TaskStatus.effective_next_run(task)
       task

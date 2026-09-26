@@ -7,6 +7,8 @@ module SnsMultipost
   module TaskStatus
     module_function
 
+    class CommandTimedOut < StandardError; end
+
     STATE_LABELS = {
       "Disabled" => "一時停止",
       "Ready" => "有効・待機中",
@@ -15,7 +17,7 @@ module SnsMultipost
       "Unknown" => "不明"
     }.freeze
 
-    def query(task_name, capture3: Open3.method(:capture3))
+    def query(task_name, capture3: nil, timeout: nil)
       escaped_name = task_name.gsub("'", "''")
       script = <<~POWERSHELL
         $ErrorActionPreference = 'Stop'
@@ -30,9 +32,17 @@ module SnsMultipost
           LastTaskResult = [Int64]$info.LastTaskResult
         } | ConvertTo-Json -Compress
       POWERSHELL
-      stdout, stderr, status = capture3.call(
+      command = [
         "powershell.exe", "-NoProfile", "-NonInteractive",
-        "-ExecutionPolicy", "Bypass", "-Command", script)
+        "-ExecutionPolicy", "Bypass", "-Command", script
+      ]
+      stdout, stderr, status = if capture3
+                                 capture3.call(*command)
+                               elsif timeout
+                                 capture3_with_timeout(*command, timeout: timeout)
+                               else
+                                 Open3.capture3(*command)
+                               end
       unless status.success?
         message = utf8(stderr).strip
         message = "終了コード#{status.exitstatus}" if message.empty?
@@ -40,8 +50,42 @@ module SnsMultipost
       end
 
       JSON.parse(utf8(stdout))
+    rescue CommandTimedOut
+      raise "Windowsタスク「#{task_name}」の状態取得が#{timeout}秒以内に完了しませんでした"
     rescue JSON::ParserError => e
       raise "Windowsタスク「#{task_name}」の結果を解析できません: #{e.message}"
+    end
+
+    def capture3_with_timeout(*command, timeout:)
+      stdin = stdout = stderr = wait_thread = nil
+      stdout_reader = stderr_reader = nil
+      stdin, stdout, stderr, wait_thread = Open3.popen3(*command)
+      stdin.close
+      stdout_reader = Thread.new { stdout.read }
+      stderr_reader = Thread.new { stderr.read }
+      unless wait_thread.join(Float(timeout))
+        terminate_process(wait_thread.pid)
+        wait_thread.join(2)
+        raise CommandTimedOut
+      end
+
+      [stdout_reader.value, stderr_reader.value, wait_thread.value]
+    ensure
+      [stdin, stdout, stderr].compact.each do |stream|
+        stream.close unless stream.closed?
+      rescue IOError
+        nil
+      end
+      [stdout_reader, stderr_reader].compact.each do |reader|
+        reader.kill if reader.alive?
+      end
+      terminate_process(wait_thread.pid) if wait_thread&.alive?
+    end
+
+    def terminate_process(pid)
+      Process.kill("KILL", pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      nil
     end
 
     def set_enabled(task_name, enabled:, capture3: Open3.method(:capture3))

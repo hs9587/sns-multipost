@@ -1,6 +1,7 @@
 require_relative "test_helper"
 require "task_status"
 require "fileutils"
+require "rbconfig"
 
 class TaskStatusTest < Minitest::Test
   FakeStatus = Struct.new(:success?, :exitstatus)
@@ -43,6 +44,18 @@ class TaskStatusTest < Minitest::Test
   def test_formats_other_result_as_decimal_and_hex
     assert_equal "267009 (0x00041301)",
                  SnsMultipost::TaskStatus.format_result(267_009)
+  end
+
+  def test_external_command_timeout_terminates_process
+    started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    assert_raises(SnsMultipost::TaskStatus::CommandTimedOut) do
+      SnsMultipost::TaskStatus.capture3_with_timeout(
+        RbConfig.ruby, "-e", "sleep 30", timeout: 0.05)
+    end
+
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+    assert_operator elapsed, :<, 2
   end
 
   def test_set_enabled_uses_windows_task_commands
