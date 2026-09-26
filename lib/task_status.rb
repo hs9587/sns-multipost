@@ -119,8 +119,7 @@ module SnsMultipost
 
     def format(status, now: Time.now)
       state = status.fetch("State").to_s
-      next_run = status["NextRunTime"]
-      next_run = nil if state == "Disabled"
+      next_run = effective_next_run(status)
       [
         "タスク: #{status.fetch('TaskName')}",
         "現在時刻: #{format_time(now)}",
@@ -129,6 +128,12 @@ module SnsMultipost
         "前回実行: #{status['LastRunTime'] ? format_time(status['LastRunTime']) : 'なし'}",
         "前回結果: #{format_result(status.fetch('LastTaskResult'))}"
       ].join("\n")
+    end
+
+    def effective_next_run(status)
+      return nil if status["State"].to_s == "Disabled"
+
+      status["NextRunTime"]
     end
 
     def format_time(value)

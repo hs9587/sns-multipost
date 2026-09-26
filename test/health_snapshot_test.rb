@@ -39,4 +39,21 @@ class HealthSnapshotTest < Minitest::Test
                    snapshot.dig("jobs", "recent_failed")
     end
   end
+
+  def test_hides_stale_next_run_time_when_task_is_disabled
+    Dir.mktmpdir do |root|
+      %w[done failed state].each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+      task = {
+        "TaskName" => "sns-multipost", "State" => "Disabled",
+        "NextRunTime" => "2026-09-26T22:05:00+09:00"
+      }
+
+      snapshot = SnsMultipost::HealthSnapshot.new(
+        root: root, task_query: -> { task }).build(server_state: {})
+
+      assert_equal "disabled", snapshot.fetch("status")
+      assert_nil snapshot.dig("task", "NextRunTime")
+      assert_equal "2026-09-26T22:05:00+09:00", task["NextRunTime"]
+    end
+  end
 end

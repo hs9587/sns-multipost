@@ -37,7 +37,9 @@ module SnsMultipost
     private
 
     def safe_task
-      @task_query.call
+      task = @task_query.call.dup
+      task["NextRunTime"] = TaskStatus.effective_next_run(task)
+      task
     rescue StandardError => e
       { "TaskName" => @task_name, "error" => e.message }
     end
