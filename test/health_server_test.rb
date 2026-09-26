@@ -56,6 +56,18 @@ class HealthServerTest < Minitest::Test
     refute_includes hidden.body, "config.yml"
   end
 
+  def test_unknown_path_does_not_query_operational_status
+    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
+      def snapshot.build(server_state:)
+        raise "状態照会を実行してはいけません"
+      end
+    end)
+
+    response = response_for("GET", "/favicon.ico")
+
+    assert_equal 404, response.status
+  end
+
   def test_explains_unresolved_failed_jobs_without_assuming_retry
     @snapshot["status"] = "failed"
     @snapshot["jobs"] = {

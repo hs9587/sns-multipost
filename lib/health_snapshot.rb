@@ -1,15 +1,19 @@
 require "time"
+require "timeout"
 require_relative "job_history"
 require_relative "task_runner"
 require_relative "task_status"
 
 module SnsMultipost
   class HealthSnapshot
-    def initialize(root:, task_name: "sns-multipost", clock: -> { Time.now }, task_query: nil)
+    def initialize(root:, task_name: "sns-multipost", clock: -> { Time.now }, task_query: nil,
+                   task_timeout: 10)
       @root = File.expand_path(root)
       @task_name = task_name
       @clock = clock
       @task_query = task_query || -> { TaskStatus.query(@task_name) }
+      @task_timeout = task_timeout
+      @task_mutex = Mutex.new
     end
 
     def build(server_state:)
@@ -37,9 +41,16 @@ module SnsMultipost
     private
 
     def safe_task
-      task = @task_query.call.dup
+      task = Timeout.timeout(@task_timeout) do
+        @task_mutex.synchronize { @task_query.call }
+      end.dup
       task["NextRunTime"] = TaskStatus.effective_next_run(task)
       task
+    rescue Timeout::Error
+      {
+        "TaskName" => @task_name,
+        "error" => "Windowsタスクの状態取得が#{@task_timeout}秒以内に完了しませんでした"
+      }
     rescue StandardError => e
       { "TaskName" => @task_name, "error" => e.message }
     end

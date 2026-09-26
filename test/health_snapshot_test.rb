@@ -56,4 +56,18 @@ class HealthSnapshotTest < Minitest::Test
       assert_equal "2026-09-26T22:05:00+09:00", task["NextRunTime"]
     end
   end
+
+  def test_times_out_slow_task_query_instead_of_blocking_health_page
+    Dir.mktmpdir do |root|
+      %w[done failed state].each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+
+      snapshot = SnsMultipost::HealthSnapshot.new(
+        root: root,
+        task_timeout: 0.01,
+        task_query: -> { sleep 1 }).build(server_state: {})
+
+      assert_equal "error", snapshot.fetch("status")
+      assert_includes snapshot.dig("task", "error"), "状態取得が0.01秒以内に完了しませんでした"
+    end
+  end
 end

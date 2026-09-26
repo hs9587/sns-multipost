@@ -65,12 +65,13 @@ module SnsMultipost
         return
       end
 
-      snapshot = @snapshot.build(server_state: state)
       case request.path
       when "/"
+        snapshot = @snapshot.build(server_state: state)
         response["Content-Type"] = "text/html; charset=utf-8"
         response.body = html(snapshot)
       when "/health.json"
+        snapshot = @snapshot.build(server_state: state)
         response["Content-Type"] = "application/json; charset=utf-8"
         response.body = JSON.pretty_generate(snapshot) + "\n"
       else
