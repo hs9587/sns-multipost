@@ -14,7 +14,8 @@ module SnsMultipost
 
     def initialize(root:, selector:, port: 8765, task_name: "sns-multipost",
                    network_resolver: HealthNetwork.method(:resolve), clock: -> { Time.now },
-                   monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+                   monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) },
+                   refresh_interval: 10)
       @root = File.expand_path(root)
       @selector = selector
       @port = Integer(port)
@@ -22,6 +23,8 @@ module SnsMultipost
 
       @clock = clock
       @monotonic_clock = monotonic_clock
+      @refresh_interval = Float(refresh_interval)
+      raise "状態更新間隔は0より大きく指定してください" unless @refresh_interval.positive?
       @network = network_resolver.call(selector)
       @snapshot = HealthSnapshot.new(root: @root, task_name: task_name, clock: clock)
       @started_at = clock.call
@@ -34,14 +37,18 @@ module SnsMultipost
       logger = WEBrick::Log.new(File.join(@root, "logs", "health.log"), WEBrick::Log::INFO)
       server = WEBrick::HTTPServer.new(
         BindAddress: network.fetch("address"), Port: port,
-        AccessLog: [], Logger: logger,
+        AccessLog: [[logger, WEBrick::AccessLog::COMMON_LOG_FORMAT]], Logger: logger,
         ServerSoftware: "sns-multipost-health")
       state = runtime_state
+      initialize_snapshot_cache(state)
+      poller = start_snapshot_poller(state)
       HealthRuntime.save(@root, state)
       server.mount_proc("/") { |request, response| respond(request, response, state) }
       %w[INT TERM].each { |signal| trap(signal) { server.shutdown } }
       server.start
     ensure
+      poller&.kill
+      poller&.join(1)
       HealthRuntime.remove(@root, pid: Process.pid)
     end
 
@@ -71,11 +78,11 @@ module SnsMultipost
 
       case request.path
       when "/"
-        snapshot = timed_snapshot(state)
+        snapshot = current_snapshot(state)
         response["Content-Type"] = "text/html; charset=utf-8"
         response.body = html(snapshot, script_nonce: script_nonce)
       when "/health.json"
-        snapshot = timed_snapshot(state)
+        snapshot = current_snapshot(state)
         response["Content-Type"] = "application/json; charset=utf-8"
         response.body = JSON.pretty_generate(snapshot) + "\n"
       when "/ping"
@@ -106,6 +113,57 @@ module SnsMultipost
         })
     end
 
+    def initialize_snapshot_cache(state)
+      now = @clock.call
+      @snapshot_cache_mutex = Mutex.new
+      @snapshot_cache = {
+        "status" => "error",
+        "server_time" => now.iso8601,
+        "server" => state,
+        "task" => { "error" => "状態を取得中です" },
+        "runner" => {},
+        "jobs" => {
+          "latest_done" => nil,
+          "latest_done_at" => nil,
+          "recent_failed_count" => 0,
+          "recent_failed" => []
+        },
+        "request" => {
+          "started_at" => now.iso8601,
+          "completed_at" => now.iso8601,
+          "elapsed_ms" => 0
+        }
+      }
+    end
+
+    def start_snapshot_poller(state)
+      Thread.new do
+        loop do
+          snapshot = timed_snapshot(state)
+          @snapshot_cache_mutex.synchronize { @snapshot_cache = snapshot }
+          sleep(@refresh_interval)
+        rescue StandardError => e
+          now = @clock.call
+          failed = @snapshot_cache_mutex.synchronize { Marshal.load(Marshal.dump(@snapshot_cache)) }
+          failed["status"] = "error"
+          failed["task"] = { "error" => "状態の定期更新に失敗しました: #{e.message}" }
+          failed["request"] = {
+            "started_at" => now.iso8601,
+            "completed_at" => now.iso8601,
+            "elapsed_ms" => 0
+          }
+          @snapshot_cache_mutex.synchronize { @snapshot_cache = failed }
+          sleep(@refresh_interval)
+        end
+      end
+    end
+
+    def current_snapshot(state)
+      return timed_snapshot(state) unless @snapshot_cache_mutex
+
+      @snapshot_cache_mutex.synchronize { Marshal.load(Marshal.dump(@snapshot_cache)) }
+    end
+
     def set_headers(response, script_nonce:)
       response["Cache-Control"] = "no-store"
       response["X-Content-Type-Options"] = "nosniff"
@@ -134,9 +192,9 @@ module SnsMultipost
         <h1>sns-multipost 状態</h1>
         <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>
         <dl>
-          <dt>状態取得開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
-          <dt>状態取得完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
-          <dt>状態取得時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
+          <dt>状態更新開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
+          <dt>状態更新完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
+          <dt>状態更新時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
           <dt>閲覧開始時刻</dt><dd id="client-started-at">取得中</dd>
           <dt>ページ受信時刻</dt><dd id="client-completed-at">取得中</dd>
           <dt>閲覧側所要時間</dt><dd id="client-elapsed">取得中</dd>

@@ -55,9 +55,9 @@ class HealthServerTest < Minitest::Test
     response = response_for("GET", "/")
     html = response.body
 
-    assert_includes html, "状態取得開始"
-    assert_includes html, "状態取得完了"
-    assert_includes html, "状態取得時間"
+    assert_includes html, "状態更新開始"
+    assert_includes html, "状態更新完了"
+    assert_includes html, "状態更新時間"
     assert_match(/0\.1[23]秒/, html)
     assert_includes html, "監視サーバー起動日時"
     refute_includes html, "<dt>起動日時</dt>"
@@ -104,6 +104,21 @@ class HealthServerTest < Minitest::Test
 
     assert_equal 200, response.status
     assert_equal "text/plain; charset=utf-8", response["Content-Type"]
+  end
+
+  def test_status_page_uses_cache_without_querying_operational_status
+    state = @server.runtime_state
+    @server.send(:initialize_snapshot_cache, state)
+    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
+      def snapshot.build(server_state:)
+        raise "要求処理中に状態照会を実行してはいけません"
+      end
+    end)
+
+    response = response_for("GET", "/")
+
+    assert_equal 200, response.status
+    assert_includes response.body, "状態を取得中です"
   end
 
   def test_explains_unresolved_failed_jobs_without_assuming_retry
