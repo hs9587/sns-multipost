@@ -46,13 +46,19 @@ module SnsMultipost
 
       pid = Integer(state.fetch("pid"))
       _stdout, stderr, status = @capture3.call("taskkill.exe", "/PID", pid.to_s, "/T", "/F")
-      command_error!("停止", stderr, status) unless status.success?
+      unless status.success?
+        unless HealthRuntime.port_open?(state, timeout: 0.1)
+          HealthRuntime.remove(@root)
+          return true
+        end
+        command_error!("停止", stderr, status)
+      end
       20.times do
-        break unless HealthRuntime.process_alive?(pid)
+        break unless HealthRuntime.port_open?(state, timeout: 0.1)
         @sleeper.call(0.1)
       end
-      if HealthRuntime.process_alive?(pid)
-        raise "監視サーバーを停止できません（PID #{pid}が残っています）"
+      if HealthRuntime.port_open?(state, timeout: 0.1)
+        raise "監視サーバーを停止できません（#{state['resolved_ip']}:#{state['port']}が待受中です）"
       end
 
       HealthRuntime.remove(@root)
