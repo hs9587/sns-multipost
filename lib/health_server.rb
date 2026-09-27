@@ -12,13 +12,15 @@ module SnsMultipost
     attr_reader :network, :port
 
     def initialize(root:, selector:, port: 8765, task_name: "sns-multipost",
-                   network_resolver: HealthNetwork.method(:resolve), clock: -> { Time.now })
+                   network_resolver: HealthNetwork.method(:resolve), clock: -> { Time.now },
+                   monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
       @root = File.expand_path(root)
       @selector = selector
       @port = Integer(port)
       raise "ポートは1～65535で指定してください" unless @port.between?(1, 65_535)
 
       @clock = clock
+      @monotonic_clock = monotonic_clock
       @network = network_resolver.call(selector)
       @snapshot = HealthSnapshot.new(root: @root, task_name: task_name, clock: clock)
       @started_at = clock.call
@@ -67,11 +69,11 @@ module SnsMultipost
 
       case request.path
       when "/"
-        snapshot = @snapshot.build(server_state: state)
+        snapshot = timed_snapshot(state)
         response["Content-Type"] = "text/html; charset=utf-8"
         response.body = html(snapshot)
       when "/health.json"
-        snapshot = @snapshot.build(server_state: state)
+        snapshot = timed_snapshot(state)
         response["Content-Type"] = "application/json; charset=utf-8"
         response.body = JSON.pretty_generate(snapshot) + "\n"
       else
@@ -83,6 +85,20 @@ module SnsMultipost
       response.status = 500
       response["Content-Type"] = "application/json; charset=utf-8"
       response.body = JSON.generate("status" => "error", "error" => e.message) + "\n"
+    end
+
+    def timed_snapshot(state)
+      started_at = @clock.call
+      started_tick = @monotonic_clock.call
+      snapshot = @snapshot.build(server_state: state)
+      completed_at = @clock.call
+      elapsed_ms = ((@monotonic_clock.call - started_tick) * 1000).round
+      snapshot.merge(
+        "request" => {
+          "started_at" => started_at.iso8601,
+          "completed_at" => completed_at.iso8601,
+          "elapsed_ms" => elapsed_ms
+        })
     end
 
     def set_headers(response)
@@ -98,6 +114,7 @@ module SnsMultipost
       runner = snapshot.fetch("runner")
       jobs = snapshot.fetch("jobs")
       server = snapshot.fetch("server")
+      request = snapshot.fetch("request")
       failed = jobs.fetch("recent_failed").map { |name| "<li>#{h(name)}</li>" }.join
       failed_count = jobs.fetch("recent_failed_count")
       last_run = runner["last_run"] || {}
@@ -111,9 +128,11 @@ module SnsMultipost
         <h1>sns-multipost 状態</h1>
         <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>
         <dl>
-          <dt>サーバー時刻</dt><dd>#{h(format_time(snapshot["server_time"]))}</dd>
+          <dt>状態取得開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
+          <dt>状態取得完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
+          <dt>状態取得時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
           <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
-          <dt>起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
+          <dt>監視サーバー起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
           <dt>投稿タスク</dt><dd>#{h(task["State"] || task["error"] || "不明")}</dd>
           <dt>前回実行</dt><dd>#{h(format_time(task["LastRunTime"]))}</dd>
           <dt>次回実行</dt><dd>#{h(format_time(task["NextRunTime"]))}</dd>
@@ -152,6 +171,17 @@ module SnsMultipost
 
       Time.iso8601(value.to_s).strftime("%Y年%-m月%-d日 %-H:%M:%S")
     rescue ArgumentError
+      value.to_s
+    end
+
+    def format_elapsed(value)
+      milliseconds = Integer(value)
+      seconds = milliseconds / 1000.0
+      return format("%.2f秒", seconds) if seconds < 60
+
+      minutes = (seconds / 60).floor
+      format("%d分%.2f秒", minutes, seconds - (minutes * 60))
+    rescue ArgumentError, TypeError
       value.to_s
     end
 

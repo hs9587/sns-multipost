@@ -9,10 +9,12 @@ class HealthServerTest < Minitest::Test
       { "selector" => selector, "kind" => "loopback", "interface" => "test", "address" => "127.0.0.1" }
     end
     @root = Dir.mktmpdir
+    monotonic_tick = 100.0
     @server = SnsMultipost::HealthServer.new(
       root: @root, selector: "127.0.0.1", port: 8765,
       network_resolver: resolver,
-      clock: -> { Time.new(2026, 9, 26, 8, 0, 0, "+09:00") })
+      clock: -> { Time.new(2026, 9, 26, 8, 0, 0, "+09:00") },
+      monotonic_clock: -> { monotonic_tick += 0.125 })
     @snapshot = {
       "status" => "ok", "server_time" => "2026-09-26T08:00:00+09:00",
       "server" => @server.runtime_state,
@@ -43,7 +45,21 @@ class HealthServerTest < Minitest::Test
     assert_equal "no-store", html["Cache-Control"]
 
     json = response_for("GET", "/health.json")
-    assert_equal "ok", JSON.parse(json.body).fetch("status")
+    parsed = JSON.parse(json.body)
+    assert_equal "ok", parsed.fetch("status")
+    assert_equal 125, parsed.dig("request", "elapsed_ms")
+  end
+
+
+  def test_labels_server_start_and_request_timing_clearly
+    html = response_for("GET", "/").body
+
+    assert_includes html, "状態取得開始"
+    assert_includes html, "状態取得完了"
+    assert_includes html, "状態取得時間"
+    assert_match(/0\.1[23]秒/, html)
+    assert_includes html, "監視サーバー起動日時"
+    refute_includes html, "<dt>起動日時</dt>"
   end
 
   def test_rejects_update_methods_and_unknown_paths
