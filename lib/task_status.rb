@@ -69,7 +69,9 @@ module SnsMultipost
         raise CommandTimedOut
       end
 
-      [stdout_reader.value, stderr_reader.value, wait_thread.value]
+      stdout_value = reader_value(stdout_reader, timeout: 1)
+      stderr_value = reader_value(stderr_reader, timeout: 1)
+      [stdout_value, stderr_value, wait_thread.value]
     ensure
       terminate_process(wait_thread.pid) if wait_thread&.alive?
       [stdout_reader, stderr_reader].compact.each do |reader|
@@ -81,6 +83,16 @@ module SnsMultipost
       rescue IOError
         nil
       end
+    end
+
+    def reader_value(reader, timeout:)
+      unless reader.join(Float(timeout))
+        reader.kill
+        reader.join(0.2)
+        raise CommandTimedOut
+      end
+
+      reader.value
     end
 
     def terminate_process(pid)

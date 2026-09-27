@@ -67,7 +67,33 @@ class HealthSnapshotTest < Minitest::Test
         task_query: -> { sleep 1 }).build(server_state: {})
 
       assert_equal "error", snapshot.fetch("status")
-      assert_includes snapshot.dig("task", "error"), "状態取得が0.01秒以内に完了しませんでした"
+      assert_includes snapshot.dig("task", "error"), "状態取得または待機が1.01秒以内に完了しませんでした"
+    end
+  end
+
+  def test_times_out_while_another_task_query_holds_the_mutex
+    Dir.mktmpdir do |root|
+      %w[done failed state].each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+      entered = Queue.new
+      release = Queue.new
+      snapshot = SnsMultipost::HealthSnapshot.new(
+        root: root,
+        task_timeout: 0.02,
+        task_query: lambda {
+          entered << true
+          release.pop
+          { "TaskName" => "sns-multipost", "State" => "Ready" }
+        })
+      holder = Thread.new { snapshot.build(server_state: {}) }
+      entered.pop
+
+      result = snapshot.build(server_state: {})
+
+      assert_equal "error", result.fetch("status")
+      assert_includes result.dig("task", "error"), "状態取得または待機"
+    ensure
+      release << true
+      holder&.join(1)
     end
   end
 end

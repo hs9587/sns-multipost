@@ -35,4 +35,22 @@ class HealthRuntimeTest < Minitest::Test
     })
     assert SnsMultipost::HealthRuntime.process_alive?(Process.pid)
   end
+
+  def test_http_health_check_requires_ping_response
+    server = TCPServer.new("127.0.0.1", 0)
+    worker = Thread.new do
+      socket = server.accept
+      request = socket.readpartial(1024)
+      assert_includes request, "HEAD /ping HTTP/1.1"
+      socket.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+      socket.close
+    end
+
+    assert SnsMultipost::HealthRuntime.http_healthy?({
+      "resolved_ip" => "127.0.0.1", "port" => server.addr[1]
+    }, timeout: 1)
+  ensure
+    worker&.join(1)
+    server&.close
+  end
 end

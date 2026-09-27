@@ -93,6 +93,19 @@ class HealthServerTest < Minitest::Test
     assert_equal 404, response.status
   end
 
+  def test_ping_does_not_query_operational_status
+    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
+      def snapshot.build(server_state:)
+        raise "状態照会を実行してはいけません"
+      end
+    end)
+
+    response = response_for("HEAD", "/ping")
+
+    assert_equal 200, response.status
+    assert_equal "text/plain; charset=utf-8", response["Content-Type"]
+  end
+
   def test_explains_unresolved_failed_jobs_without_assuming_retry
     @snapshot["status"] = "failed"
     @snapshot["jobs"] = {

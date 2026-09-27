@@ -34,8 +34,24 @@ module SnsMultipost
       pid = Integer(state["pid"])
       return false unless process_alive?(pid)
 
-      port_open?(state, timeout: timeout)
+      http_healthy?(state, timeout: timeout)
     rescue ArgumentError, TypeError
+      false
+    end
+
+    def http_healthy?(state, timeout: 0.5)
+      address = state["resolved_ip"].to_s
+      port = Integer(state["port"])
+      return false if address.empty?
+
+      Socket.tcp(address, port, connect_timeout: timeout) do |socket|
+        socket.write("HEAD /ping HTTP/1.1\r\nHost: #{address}:#{port}\r\nConnection: close\r\n\r\n")
+        return false unless IO.select([socket], nil, nil, timeout)
+
+        return socket.gets.to_s.match?(%r{\AHTTP/1\.[01] 200\b})
+      end
+      false
+    rescue ArgumentError, TypeError, SystemCallError, IOError
       false
     end
 

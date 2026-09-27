@@ -78,6 +78,9 @@ module SnsMultipost
         snapshot = timed_snapshot(state)
         response["Content-Type"] = "application/json; charset=utf-8"
         response.body = JSON.pretty_generate(snapshot) + "\n"
+      when "/ping"
+        response["Content-Type"] = "text/plain; charset=utf-8"
+        response.body = "ok\n"
       else
         response.status = 404
         response["Content-Type"] = "text/plain; charset=utf-8"

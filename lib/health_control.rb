@@ -45,12 +45,15 @@ module SnsMultipost
       return task_registered if state.empty?
 
       pid = Integer(state.fetch("pid"))
-      @capture3.call("taskkill.exe", "/PID", pid.to_s, "/T", "/F")
+      _stdout, stderr, status = @capture3.call("taskkill.exe", "/PID", pid.to_s, "/T", "/F")
+      command_error!("停止", stderr, status) unless status.success?
       20.times do
-        break unless HealthRuntime.reachable?(state)
+        break unless HealthRuntime.process_alive?(pid)
         @sleeper.call(0.1)
       end
-      raise "監視サーバーを停止できません（PID #{pid}）" if HealthRuntime.reachable?(state)
+      if HealthRuntime.process_alive?(pid)
+        raise "監視サーバーを停止できません（PID #{pid}が残っています）"
+      end
 
       HealthRuntime.remove(@root)
       true

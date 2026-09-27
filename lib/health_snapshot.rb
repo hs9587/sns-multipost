@@ -42,11 +42,13 @@ module SnsMultipost
     private
 
     def safe_task
-      task = @task_mutex.synchronize do
-        if @custom_task_query
-          Timeout.timeout(@task_timeout) { @task_query.call }
-        else
-          @task_query.call
+      task = Timeout.timeout(@task_timeout + 1) do
+        @task_mutex.synchronize do
+          if @custom_task_query
+            Timeout.timeout(@task_timeout) { @task_query.call }
+          else
+            @task_query.call
+          end
         end
       end.dup
       task["NextRunTime"] = TaskStatus.effective_next_run(task)
@@ -54,7 +56,7 @@ module SnsMultipost
     rescue Timeout::Error
       {
         "TaskName" => @task_name,
-        "error" => "Windowsタスクの状態取得が#{@task_timeout}秒以内に完了しませんでした"
+        "error" => "Windowsタスクの状態取得または待機が#{@task_timeout + 1}秒以内に完了しませんでした"
       }
     rescue StandardError => e
       { "TaskName" => @task_name, "error" => e.message }
