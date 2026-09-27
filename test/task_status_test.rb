@@ -58,6 +58,25 @@ class TaskStatusTest < Minitest::Test
     assert_operator elapsed, :<, 2
   end
 
+  def test_external_command_timeout_terminates_descendants_holding_output_pipe
+    child_code = "sleep 30"
+    parent_code = <<~RUBY
+      Process.spawn(
+        #{RbConfig.ruby.dump}, "-e", #{child_code.dump},
+        out: $stdout, err: $stderr)
+      sleep 30
+    RUBY
+    started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    assert_raises(SnsMultipost::TaskStatus::CommandTimedOut) do
+      SnsMultipost::TaskStatus.capture3_with_timeout(
+        RbConfig.ruby, "-e", parent_code, timeout: 0.1)
+    end
+
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+    assert_operator elapsed, :<, 3
+  end
+
   def test_set_enabled_uses_windows_task_commands
     scripts = []
     capture3 = lambda do |*_args|

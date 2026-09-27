@@ -71,20 +71,27 @@ module SnsMultipost
 
       [stdout_reader.value, stderr_reader.value, wait_thread.value]
     ensure
+      terminate_process(wait_thread.pid) if wait_thread&.alive?
+      [stdout_reader, stderr_reader].compact.each do |reader|
+        reader.kill if reader.alive?
+        reader.join(0.2)
+      end
       [stdin, stdout, stderr].compact.each do |stream|
         stream.close unless stream.closed?
       rescue IOError
         nil
       end
-      [stdout_reader, stderr_reader].compact.each do |reader|
-        reader.kill if reader.alive?
-      end
-      terminate_process(wait_thread.pid) if wait_thread&.alive?
     end
 
     def terminate_process(pid)
+      if Gem.win_platform?
+        stopped = system(
+          "taskkill.exe", "/PID", pid.to_s, "/T", "/F",
+          out: File::NULL, err: File::NULL)
+        return if stopped
+      end
       Process.kill("KILL", pid)
-    rescue Errno::ESRCH, Errno::EPERM
+    rescue Errno::ESRCH, Errno::EPERM, Errno::EINVAL
       nil
     end
 
