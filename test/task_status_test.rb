@@ -46,6 +46,32 @@ class TaskStatusTest < Minitest::Test
                  SnsMultipost::TaskStatus.format_result(267_009)
   end
 
+  def test_queries_task_scheduler_via_com_without_powershell
+    task = Struct.new(:Name, :State, :NextRunTime, :LastRunTime, :LastTaskResult).new(
+      "sns-multipost", 3,
+      Time.new(2026, 9, 27, 14, 5, 0, "+09:00"),
+      Time.new(2026, 9, 27, 13, 55, 1, "+09:00"), 0)
+    folder = Object.new
+    folder.define_singleton_method(:GetTask) do |name|
+      raise "wrong task" unless name == "sns-multipost"
+      task
+    end
+    service = Object.new
+    service.define_singleton_method(:Connect) { true }
+    service.define_singleton_method(:GetFolder) do |path|
+      raise "wrong folder" unless path == "\\"
+      folder
+    end
+
+    status = SnsMultipost::TaskStatus.query_via_com(
+      "sns-multipost", service_factory: -> { service })
+
+    assert_equal "Ready", status.fetch("State")
+    assert_equal "2026-09-27T14:05:00+09:00", status.fetch("NextRunTime")
+    assert_equal "2026-09-27T13:55:01+09:00", status.fetch("LastRunTime")
+    assert_equal 0, status.fetch("LastTaskResult")
+  end
+
   def test_external_command_timeout_terminates_process
     started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 

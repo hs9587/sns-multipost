@@ -16,6 +16,38 @@ module SnsMultipost
       "Queued" => "実行待ち",
       "Unknown" => "不明"
     }.freeze
+    COM_STATE_LABELS = {
+      0 => "Unknown", 1 => "Disabled", 2 => "Queued", 3 => "Ready", 4 => "Running"
+    }.freeze
+
+    def query_via_com(task_name, service_factory: nil)
+      require "win32ole"
+      service = service_factory ? service_factory.call : WIN32OLE.new("Schedule.Service")
+      service.Connect
+      task = service.GetFolder("\\").GetTask(task_name)
+      {
+        "TaskName" => task.Name.to_s,
+        "State" => COM_STATE_LABELS.fetch(Integer(task.State), "Unknown"),
+        "NextRunTime" => com_time(task.NextRunTime),
+        "LastRunTime" => com_time(task.LastRunTime),
+        "LastTaskResult" => Integer(task.LastTaskResult)
+      }
+    rescue LoadError => e
+      raise "Windowsタスク「#{task_name}」のCOM照会を利用できません: #{e.message}"
+    rescue StandardError => e
+      raise "Windowsタスク「#{task_name}」をCOMで確認できません: #{e.message}"
+    end
+
+    def com_time(value)
+      return nil if value.nil?
+
+      time = value.is_a?(Time) ? value : Time.parse(value.to_s)
+      return nil unless time.year > 1900
+
+      time.iso8601
+    rescue ArgumentError, TypeError
+      nil
+    end
 
     def query(task_name, capture3: nil, timeout: nil)
       escaped_name = task_name.gsub("'", "''")

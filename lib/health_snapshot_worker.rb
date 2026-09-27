@@ -2,6 +2,7 @@ require "time"
 require_relative "health_runtime"
 require_relative "health_snapshot"
 require_relative "health_snapshot_cache"
+require_relative "task_status"
 
 module SnsMultipost
   class HealthSnapshotWorker
@@ -10,7 +11,9 @@ module SnsMultipost
       @root = File.expand_path(root)
       @clock = clock
       @monotonic_clock = monotonic_clock
-      @snapshot = HealthSnapshot.new(root: @root, task_name: task_name, clock: clock)
+      @snapshot = HealthSnapshot.new(
+        root: @root, task_name: task_name, clock: clock,
+        task_query: -> { TaskStatus.query_via_com(task_name) })
     end
 
     def run(parent_pid:, interval: 10)
