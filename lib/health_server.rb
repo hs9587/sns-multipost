@@ -1,12 +1,13 @@
 require "cgi"
 require "fileutils"
 require "json"
+require "rbconfig"
 require "securerandom"
 require "time"
 require "webrick"
 require_relative "health_network"
 require_relative "health_runtime"
-require_relative "health_snapshot"
+require_relative "health_snapshot_cache"
 
 module SnsMultipost
   class HealthServer
@@ -14,7 +15,6 @@ module SnsMultipost
 
     def initialize(root:, selector:, port: 8765, task_name: "sns-multipost",
                    network_resolver: HealthNetwork.method(:resolve), clock: -> { Time.now },
-                   monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) },
                    refresh_interval: 10)
       @root = File.expand_path(root)
       @selector = selector
@@ -22,11 +22,10 @@ module SnsMultipost
       raise "ポートは1～65535で指定してください" unless @port.between?(1, 65_535)
 
       @clock = clock
-      @monotonic_clock = monotonic_clock
       @refresh_interval = Float(refresh_interval)
       raise "状態更新間隔は0より大きく指定してください" unless @refresh_interval.positive?
       @network = network_resolver.call(selector)
-      @snapshot = HealthSnapshot.new(root: @root, task_name: task_name, clock: clock)
+      @task_name = task_name
       @started_at = clock.call
     rescue ArgumentError, TypeError
       raise "ポートは1～65535で指定してください"
@@ -40,16 +39,17 @@ module SnsMultipost
         AccessLog: [[logger, WEBrick::AccessLog::COMMON_LOG_FORMAT]], Logger: logger,
         ServerSoftware: "sns-multipost-health")
       state = runtime_state
-      initialize_snapshot_cache(state)
-      poller = start_snapshot_poller(state)
+      HealthSnapshotCache.save(
+        @root, HealthSnapshotCache.initial(server_state: state, now: @clock.call))
+      HealthRuntime.save(@root, state)
+      state["worker_pid"] = start_snapshot_worker
       HealthRuntime.save(@root, state)
       server.mount_proc("/") { |request, response| respond(request, response, state) }
       %w[INT TERM].each { |signal| trap(signal) { server.shutdown } }
       server.start
     ensure
-      poller&.kill
-      poller&.join(1)
       HealthRuntime.remove(@root, pid: Process.pid)
+      HealthSnapshotCache.remove(@root)
     end
 
     def runtime_state
@@ -99,69 +99,26 @@ module SnsMultipost
       response.body = JSON.generate("status" => "error", "error" => e.message) + "\n"
     end
 
-    def timed_snapshot(state)
-      started_at = @clock.call
-      started_tick = @monotonic_clock.call
-      snapshot = @snapshot.build(server_state: state)
-      completed_at = @clock.call
-      elapsed_ms = ((@monotonic_clock.call - started_tick) * 1000).round
-      snapshot.merge(
-        "request" => {
-          "started_at" => started_at.iso8601,
-          "completed_at" => completed_at.iso8601,
-          "elapsed_ms" => elapsed_ms
-        })
-    end
-
-    def initialize_snapshot_cache(state)
-      now = @clock.call
-      @snapshot_cache_mutex = Mutex.new
-      @snapshot_cache = {
-        "status" => "error",
-        "server_time" => now.iso8601,
-        "server" => state,
-        "task" => { "error" => "状態を取得中です" },
-        "runner" => {},
-        "jobs" => {
-          "latest_done" => nil,
-          "latest_done_at" => nil,
-          "recent_failed_count" => 0,
-          "recent_failed" => []
-        },
-        "request" => {
-          "started_at" => now.iso8601,
-          "completed_at" => now.iso8601,
-          "elapsed_ms" => 0
-        }
-      }
-    end
-
-    def start_snapshot_poller(state)
-      Thread.new do
-        loop do
-          snapshot = timed_snapshot(state)
-          @snapshot_cache_mutex.synchronize { @snapshot_cache = snapshot }
-          sleep(@refresh_interval)
-        rescue StandardError => e
-          now = @clock.call
-          failed = @snapshot_cache_mutex.synchronize { Marshal.load(Marshal.dump(@snapshot_cache)) }
-          failed["status"] = "error"
-          failed["task"] = { "error" => "状態の定期更新に失敗しました: #{e.message}" }
-          failed["request"] = {
-            "started_at" => now.iso8601,
-            "completed_at" => now.iso8601,
-            "elapsed_ms" => 0
-          }
-          @snapshot_cache_mutex.synchronize { @snapshot_cache = failed }
-          sleep(@refresh_interval)
-        end
-      end
+    def start_snapshot_worker
+      log = File.open(File.join(@root, "logs", "health-launch.log"), "ab")
+      command = [
+        RbConfig.ruby, File.join(@root, "bin", "health_snapshot_worker"),
+        Process.pid.to_s, @refresh_interval.to_s, @task_name
+      ]
+      pid = Process.spawn(*command, chdir: @root, out: log, err: log)
+      Process.detach(pid)
+      pid
+    ensure
+      log&.close
     end
 
     def current_snapshot(state)
-      return timed_snapshot(state) unless @snapshot_cache_mutex
+      snapshot = HealthSnapshotCache.load(@root)
+      return snapshot unless snapshot.empty?
 
-      @snapshot_cache_mutex.synchronize { Marshal.load(Marshal.dump(@snapshot_cache)) }
+      HealthSnapshotCache.initial(
+        server_state: state, now: @clock.call,
+        error: "状態キャッシュを読み取れません")
     end
 
     def set_headers(response, script_nonce:)

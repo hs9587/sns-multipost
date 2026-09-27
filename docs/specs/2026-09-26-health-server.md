@@ -11,7 +11,10 @@ PCの蓋を閉じた運用中に、家庭内LANまたは既存VPN上の別端末
 - 投稿タスク `sns-multipost` とは別の長時間プロセスとする
 - 常時起動用Windowsタスク名は `sns-multipost-health`
 - 管理コマンドは `bin/health`、サーバー本体は `bin/health_server`
+- Windowsタスク等の状態取得は別プロセスのワーカーで行い、WEBrickはキャッシュだけを表示する
+- 状態取得が停止してもHTTP受付を巻き込まず、直近の状態または取得エラーを表示する
 - 稼働状態はGit管理外の `state/health_server.json` に保存する
+- 表示用キャッシュはGit管理外の `state/health_snapshot.json` に保存する
 - ログはGit管理外の `logs/health.log` と `logs/health-launch.log` に保存する
 
 ## 待受先
@@ -28,6 +31,7 @@ IP直指定でWindowsタスクへ登録した場合だけ、その非秘密IPが
 
 - `GET /`: 人向けHTML
 - `GET /health.json`: 同じ内容のJSON
+- `GET /ping`: 状態取得を行わない軽量な死活確認
 - `HEAD`: 許可
 - それ以外のメソッドは405
 - それ以外のパスは404

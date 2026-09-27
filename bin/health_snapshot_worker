@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "health_snapshot_worker"
+
+root = File.expand_path("..", __dir__)
+parent_pid, interval, task_name = ARGV
+abort "health_snapshot_worker: parent PID is required" if parent_pid.to_s.empty?
+
+SnsMultipost::HealthSnapshotWorker.new(
+  root: root, task_name: task_name || "sns-multipost"
+).run(parent_pid: Integer(parent_pid), interval: Float(interval || 10))

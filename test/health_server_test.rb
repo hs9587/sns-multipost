@@ -1,5 +1,6 @@
 require_relative "test_helper"
 require "health_server"
+require "health_snapshot_cache"
 
 class HealthServerTest < Minitest::Test
   Request = Struct.new(:request_method, :path)
@@ -9,23 +10,22 @@ class HealthServerTest < Minitest::Test
       { "selector" => selector, "kind" => "loopback", "interface" => "test", "address" => "127.0.0.1" }
     end
     @root = Dir.mktmpdir
-    monotonic_tick = 100.0
     @server = SnsMultipost::HealthServer.new(
       root: @root, selector: "127.0.0.1", port: 8765,
       network_resolver: resolver,
-      clock: -> { Time.new(2026, 9, 26, 8, 0, 0, "+09:00") },
-      monotonic_clock: -> { monotonic_tick += 0.125 })
+      clock: -> { Time.new(2026, 9, 26, 8, 0, 0, "+09:00") })
     @snapshot = {
       "status" => "ok", "server_time" => "2026-09-26T08:00:00+09:00",
       "server" => @server.runtime_state,
       "task" => { "State" => "Ready" }, "runner" => {},
-      "jobs" => { "latest_done" => nil, "recent_failed_count" => 0, "recent_failed" => [] }
+      "jobs" => { "latest_done" => nil, "recent_failed_count" => 0, "recent_failed" => [] },
+      "request" => {
+        "started_at" => "2026-09-26T08:00:00+09:00",
+        "completed_at" => "2026-09-26T08:00:00+09:00",
+        "elapsed_ms" => 125
+      }
     }
-    @server.instance_variable_set(:@snapshot, Struct.new(:value) {
-      def build(server_state:)
-        value.merge("server" => server_state)
-      end
-    }.new(@snapshot))
+    SnsMultipost::HealthSnapshotCache.save(@root, @snapshot)
   end
 
   def teardown
@@ -82,24 +82,12 @@ class HealthServerTest < Minitest::Test
   end
 
   def test_unknown_path_does_not_query_operational_status
-    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
-      def snapshot.build(server_state:)
-        raise "状態照会を実行してはいけません"
-      end
-    end)
-
     response = response_for("GET", "/favicon.ico")
 
     assert_equal 404, response.status
   end
 
   def test_ping_does_not_query_operational_status
-    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
-      def snapshot.build(server_state:)
-        raise "状態照会を実行してはいけません"
-      end
-    end)
-
     response = response_for("HEAD", "/ping")
 
     assert_equal 200, response.status
@@ -108,12 +96,11 @@ class HealthServerTest < Minitest::Test
 
   def test_status_page_uses_cache_without_querying_operational_status
     state = @server.runtime_state
-    @server.send(:initialize_snapshot_cache, state)
-    @server.instance_variable_set(:@snapshot, Object.new.tap do |snapshot|
-      def snapshot.build(server_state:)
-        raise "要求処理中に状態照会を実行してはいけません"
-      end
-    end)
+    SnsMultipost::HealthSnapshotCache.save(
+      @root,
+      SnsMultipost::HealthSnapshotCache.initial(
+        server_state: state,
+        now: Time.new(2026, 9, 26, 8, 0, 0, "+09:00")))
 
     response = response_for("GET", "/")
 
@@ -128,6 +115,7 @@ class HealthServerTest < Minitest::Test
       "recent_failed_count" => 1,
       "recent_failed" => ["20260927-065502_jotter_failed.json"]
     }
+    SnsMultipost::HealthSnapshotCache.save(@root, @snapshot)
 
     html = response_for("GET", "/").body
 
