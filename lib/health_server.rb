@@ -1,6 +1,7 @@
 require "cgi"
 require "fileutils"
 require "json"
+require "securerandom"
 require "time"
 require "webrick"
 require_relative "health_network"
@@ -59,7 +60,8 @@ module SnsMultipost
     private
 
     def respond(request, response, state)
-      set_headers(response)
+      script_nonce = SecureRandom.base64(18)
+      set_headers(response, script_nonce: script_nonce)
       unless %w[GET HEAD].include?(request.request_method)
         response.status = 405
         response["Allow"] = "GET, HEAD"
@@ -71,7 +73,7 @@ module SnsMultipost
       when "/"
         snapshot = timed_snapshot(state)
         response["Content-Type"] = "text/html; charset=utf-8"
-        response.body = html(snapshot)
+        response.body = html(snapshot, script_nonce: script_nonce)
       when "/health.json"
         snapshot = timed_snapshot(state)
         response["Content-Type"] = "application/json; charset=utf-8"
@@ -101,14 +103,15 @@ module SnsMultipost
         })
     end
 
-    def set_headers(response)
+    def set_headers(response, script_nonce:)
       response["Cache-Control"] = "no-store"
       response["X-Content-Type-Options"] = "nosniff"
-      response["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+      response["Content-Security-Policy"] =
+        "default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-#{script_nonce}'"
       response["Referrer-Policy"] = "no-referrer"
     end
 
-    def html(snapshot)
+    def html(snapshot, script_nonce:)
       status = snapshot.fetch("status")
       task = snapshot.fetch("task")
       runner = snapshot.fetch("runner")
@@ -131,6 +134,9 @@ module SnsMultipost
           <dt>状態取得開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
           <dt>状態取得完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
           <dt>状態取得時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
+          <dt>閲覧開始時刻</dt><dd id="client-started-at">取得中</dd>
+          <dt>ページ受信時刻</dt><dd id="client-completed-at">取得中</dd>
+          <dt>閲覧側所要時間</dt><dd id="client-elapsed">取得中</dd>
           <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
           <dt>監視サーバー起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
           <dt>投稿タスク</dt><dd>#{h(task["State"] || task["error"] || "不明")}</dd>
@@ -144,6 +150,25 @@ module SnsMultipost
         #{failed.empty? ? "" : "<ul>#{failed}</ul>"}
         #{failed_count.positive? ? "<p>再投稿する場合は、重複を避けるため投稿済みでないことを確認してから<code>retry</code>してください。</p>" : ""}
         <p><a href="/health.json">JSON</a></p>
+        <script nonce="#{h(script_nonce)}">
+        (() => {
+          const formatTime = (milliseconds) => {
+            const value = new Date(milliseconds);
+            return `${value.getFullYear()}年${value.getMonth() + 1}月${value.getDate()}日 ` +
+              `${value.getHours()}:${String(value.getMinutes()).padStart(2, "0")}:` +
+              `${String(value.getSeconds()).padStart(2, "0")}`;
+          };
+          const formatElapsed = (milliseconds) => {
+            const seconds = milliseconds / 1000;
+            if (seconds < 60) return `${seconds.toFixed(2)}秒`;
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}分${(seconds - minutes * 60).toFixed(2)}秒`;
+          };
+          document.getElementById("client-started-at").textContent = formatTime(performance.timeOrigin);
+          document.getElementById("client-completed-at").textContent = formatTime(Date.now());
+          document.getElementById("client-elapsed").textContent = formatElapsed(performance.now());
+        })();
+        </script>
         </body></html>
       HTML
     end

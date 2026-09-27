@@ -52,7 +52,8 @@ class HealthServerTest < Minitest::Test
 
 
   def test_labels_server_start_and_request_timing_clearly
-    html = response_for("GET", "/").body
+    response = response_for("GET", "/")
+    html = response.body
 
     assert_includes html, "状態取得開始"
     assert_includes html, "状態取得完了"
@@ -60,6 +61,14 @@ class HealthServerTest < Minitest::Test
     assert_match(/0\.1[23]秒/, html)
     assert_includes html, "監視サーバー起動日時"
     refute_includes html, "<dt>起動日時</dt>"
+    assert_includes html, "閲覧開始時刻"
+    assert_includes html, "ページ受信時刻"
+    assert_includes html, "閲覧側所要時間"
+    assert_includes html, "performance.timeOrigin"
+    nonce = response["Content-Security-Policy"][/script-src 'nonce-([^']+)'/, 1]
+    refute_nil nonce
+    assert_includes html, %Q{<script nonce="#{nonce}">}
+    refute_includes response["Content-Security-Policy"], "script-src 'unsafe-inline'"
   end
 
   def test_rejects_update_methods_and_unknown_paths
