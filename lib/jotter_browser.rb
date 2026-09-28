@@ -319,6 +319,7 @@ module SnsMultipost
                    auth_timeout: AUTH_TIMEOUT, confirmation_timeout: 40,
                    wallet_browser_id_timeout: 60,
                    savepoint_settle_seconds: SAVEPOINT_SETTLE_SECONDS,
+                   shutdown_timeout: 5, process_tree_killer: nil,
                    logger: nil,
                    sleeper: ->(seconds) { sleep seconds })
       @savepoint_url = savepoint_url.to_s.strip
@@ -331,6 +332,8 @@ module SnsMultipost
       @confirmation_timeout = confirmation_timeout
       @wallet_browser_id_timeout = wallet_browser_id_timeout
       @savepoint_settle_seconds = savepoint_settle_seconds
+      @shutdown_timeout = Float(shutdown_timeout)
+      @process_tree_killer = process_tree_killer || method(:kill_process_tree)
       @logger = logger
       @sleeper = sleeper
       @owns_browser = browser.nil?
@@ -859,19 +862,38 @@ module SnsMultipost
     def reap_chrome_process
       return unless @chrome_pid
 
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @shutdown_timeout
       loop do
         waited = Process.waitpid(@chrome_pid, Process::WNOHANG)
         return if waited
         break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
         @sleeper.call(0.1)
       end
-      Process.kill("TERM", @chrome_pid)
-      Process.waitpid(@chrome_pid) rescue nil
+      status("Jotter: 専用Chromeが終了しないためプロセスツリーを停止")
+      @process_tree_killer.call(@chrome_pid)
+      reap_deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+      loop do
+        waited = Process.waitpid(@chrome_pid, Process::WNOHANG)
+        break if waited || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= reap_deadline
+        @sleeper.call(0.1)
+      end
     rescue Errno::ECHILD, Errno::ESRCH, Errno::EINVAL
       nil
     ensure
       @chrome_pid = nil
+    end
+
+    def kill_process_tree(pid)
+      if Gem.win_platform?
+        return system(
+          "taskkill.exe", "/PID", pid.to_s, "/T", "/F",
+          out: File::NULL, err: File::NULL)
+      end
+
+      Process.kill("TERM", pid)
+      true
+    rescue Errno::ECHILD, Errno::ESRCH, Errno::EPERM, Errno::EINVAL
+      false
     end
 
     def safe_evaluate(script, *args)

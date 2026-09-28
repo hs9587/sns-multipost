@@ -1,5 +1,6 @@
 require_relative "test_helper"
 require "jotter_browser"
+require "rbconfig"
 
 class JotterBrowserTest < Minitest::Test
   class TransientNodeNotFoundError < StandardError; end
@@ -455,6 +456,41 @@ class JotterBrowserTest < Minitest::Test
         client(browser).post(text: "失敗", failure_screenshot_path: path)
       end
       assert_equal({ path: path, full: false }, browser.screenshot_call)
+    end
+  end
+
+  def test_reap_chrome_process_kills_process_tree_after_shutdown_timeout
+    pid = Process.spawn(RbConfig.ruby, "-e", "sleep 30")
+    killed = []
+    messages = []
+    jotter = SnsMultipost::JotterBrowser.new(
+      savepoint_url: "https://secret.example/savepoint",
+      browser: FakeBrowser.new,
+      shutdown_timeout: 0,
+      process_tree_killer: ->(target_pid) {
+        killed << target_pid
+        Process.kill("KILL", target_pid)
+        true
+      },
+      logger: ->(message) { messages << message },
+      sleeper: ->(_seconds) { Thread.pass })
+    jotter.instance_variable_set(:@chrome_pid, pid)
+
+    jotter.send(:reap_chrome_process)
+
+    assert_equal [pid], killed
+    assert_nil jotter.instance_variable_get(:@chrome_pid)
+    assert_includes messages, "Jotter: 専用Chromeが終了しないためプロセスツリーを停止"
+  ensure
+    begin
+      Process.kill("KILL", pid) if pid
+    rescue Errno::ESRCH, Errno::EINVAL
+      nil
+    end
+    begin
+      Process.waitpid(pid) if pid
+    rescue Errno::ECHILD
+      nil
     end
   end
 end
