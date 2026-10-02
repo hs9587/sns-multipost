@@ -31,6 +31,7 @@ module SnsMultipost
         "status" => "error",
         "server_time" => now.iso8601,
         "server" => server_state,
+        "health_task" => { "TaskName" => "sns-multipost-health", "registered" => nil },
         "task" => { "error" => error },
         "runner" => {},
         "jobs" => {

@@ -8,6 +8,7 @@ require "webrick"
 require_relative "health_network"
 require_relative "health_runtime"
 require_relative "health_snapshot_cache"
+require_relative "task_status"
 
 module SnsMultipost
   class HealthServer
@@ -135,6 +136,7 @@ module SnsMultipost
       runner = snapshot.fetch("runner")
       jobs = snapshot.fetch("jobs")
       server = snapshot.fetch("server")
+      health_task = snapshot.fetch("health_task", {})
       request = snapshot.fetch("request")
       failed = jobs.fetch("recent_failed").map { |name| "<li>#{h(name)}</li>" }.join
       failed_count = jobs.fetch("recent_failed_count")
@@ -148,16 +150,9 @@ module SnsMultipost
         </head><body>
         <h1>sns-multipost 状態</h1>
         <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>
+        <h2>投稿タスク</h2>
         <dl>
-          <dt>状態更新開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
-          <dt>状態更新完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
-          <dt>状態更新時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
-          <dt>閲覧開始時刻</dt><dd id="client-started-at">取得中</dd>
-          <dt>ページ受信時刻</dt><dd id="client-completed-at">取得中</dd>
-          <dt>閲覧側所要時間</dt><dd id="client-elapsed">取得中</dd>
-          <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
-          <dt>監視サーバー起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
-          <dt>投稿タスク</dt><dd>#{h(task["State"] || task["error"] || "不明")}</dd>
+          <dt>スケジューラ状態</dt><dd>#{h(task_state(task))}</dd>
           <dt>前回実行</dt><dd>#{h(format_time(task["LastRunTime"]))}</dd>
           <dt>次回実行</dt><dd>#{h(format_time(task["NextRunTime"]))}</dd>
           <dt>定期実行ラッパー</dt><dd>#{h(format_time(last_run["at"]))} / watch=#{h(last_run["watch_exit"])} run_queue=#{h(last_run["run_queue_exit"])} overall=#{h(last_run["overall_exit"])}</dd>
@@ -167,6 +162,18 @@ module SnsMultipost
         </dl>
         #{failed.empty? ? "" : "<ul>#{failed}</ul>"}
         #{failed_count.positive? ? "<p>再投稿する場合は、重複を避けるため投稿済みでないことを確認してから<code>retry</code>してください。</p>" : ""}
+        <h2>監視サーバー</h2>
+        <dl>
+          <dt>監視サーバー</dt><dd>#{h(server["selector"])} / #{h(server["resolved_ip"])}:#{h(server["port"])}</dd>
+          <dt>監視サーバー起動日時</dt><dd>#{h(format_time(server["started_at"]))}</dd>
+          <dt>常時起動用スケジューラ</dt><dd>#{h(health_task_state(health_task))}</dd>
+          <dt>監視データ取得開始</dt><dd>#{h(format_time(request["started_at"]))}</dd>
+          <dt>監視データ取得完了</dt><dd>#{h(format_time(request["completed_at"]))}</dd>
+          <dt>監視データ取得時間</dt><dd>#{h(format_elapsed(request["elapsed_ms"]))}</dd>
+          <dt>画面閲覧開始</dt><dd id="client-started-at">取得中</dd>
+          <dt>画面受信時刻</dt><dd id="client-completed-at">取得中</dd>
+          <dt>画面表示所要時間</dt><dd id="client-elapsed">取得中</dd>
+        </dl>
         <p><a href="/health.json">JSON</a></p>
         <script nonce="#{h(script_nonce)}">
         (() => {
@@ -200,6 +207,22 @@ module SnsMultipost
         "failed" => "定期実行で異常を記録しました",
         "error" => "状態取得エラー"
       }.fetch(status, status)
+    end
+
+    def task_state(task)
+      return task["error"] if task["error"]
+
+      state = task["State"].to_s
+      label = TaskStatus::STATE_LABELS.fetch(state, state.empty? ? "不明" : state)
+      state.empty? ? label : "#{label} (#{state})"
+    end
+
+    def health_task_state(task)
+      return "確認できません: #{task['error']}" if task["error"]
+      return "未登録" if task["registered"] == false
+      return "確認中" unless task["registered"]
+
+      "登録済み / #{task_state(task)}"
     end
 
     def format_failure(failure)

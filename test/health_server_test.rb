@@ -17,6 +17,7 @@ class HealthServerTest < Minitest::Test
     @snapshot = {
       "status" => "ok", "server_time" => "2026-09-26T08:00:00+09:00",
       "server" => @server.runtime_state,
+      "health_task" => { "registered" => true, "State" => "Ready" },
       "task" => { "State" => "Ready" }, "runner" => {},
       "jobs" => { "latest_done" => nil, "recent_failed_count" => 0, "recent_failed" => [] },
       "request" => {
@@ -51,24 +52,46 @@ class HealthServerTest < Minitest::Test
   end
 
 
-  def test_labels_server_start_and_request_timing_clearly
+  def test_prioritizes_posting_task_and_labels_monitoring_details_clearly
     response = response_for("GET", "/")
     html = response.body
 
-    assert_includes html, "状態更新開始"
-    assert_includes html, "状態更新完了"
-    assert_includes html, "状態更新時間"
+    assert_includes html, "<h2>投稿タスク</h2>"
+    assert_includes html, "スケジューラ状態"
+    assert_includes html, "有効・待機中 (Ready)"
+    assert_includes html, "<h2>監視サーバー</h2>"
+    assert_includes html, "常時起動用スケジューラ"
+    assert_includes html, "登録済み / 有効・待機中 (Ready)"
+    assert_includes html, "監視データ取得開始"
+    assert_includes html, "監視データ取得完了"
+    assert_includes html, "監視データ取得時間"
+    refute_includes html, "状態更新開始"
     assert_match(/0\.1[23]秒/, html)
     assert_includes html, "監視サーバー起動日時"
     refute_includes html, "<dt>起動日時</dt>"
-    assert_includes html, "閲覧開始時刻"
-    assert_includes html, "ページ受信時刻"
-    assert_includes html, "閲覧側所要時間"
+    assert_includes html, "画面閲覧開始"
+    assert_includes html, "画面受信時刻"
+    assert_includes html, "画面表示所要時間"
+    assert_operator html.index("<h2>投稿タスク</h2>"), :<, html.index("<h2>監視サーバー</h2>")
+    assert_operator html.index("<dt>監視サーバー</dt>"), :<,
+                    html.index("<dt>監視サーバー起動日時</dt>")
     assert_includes html, "performance.timeOrigin"
     nonce = response["Content-Security-Policy"][/script-src 'nonce-([^']+)'/, 1]
     refute_nil nonce
     assert_includes html, %Q{<script nonce="#{nonce}">}
     refute_includes response["Content-Security-Policy"], "script-src 'unsafe-inline'"
+  end
+
+  def test_labels_unregistered_health_scheduler
+    @snapshot["health_task"] = {
+      "TaskName" => "sns-multipost-health", "registered" => false
+    }
+    SnsMultipost::HealthSnapshotCache.save(@root, @snapshot)
+
+    html = response_for("GET", "/").body
+
+    assert_includes html, "常時起動用スケジューラ"
+    assert_includes html, "未登録"
   end
 
   def test_rejects_update_methods_and_unknown_paths

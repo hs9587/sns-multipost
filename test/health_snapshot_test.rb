@@ -15,12 +15,30 @@ class HealthSnapshotTest < Minitest::Test
       snapshot = SnsMultipost::HealthSnapshot.new(
         root: root,
         clock: -> { Time.new(2026, 9, 26, 7, 10, 0, "+09:00") },
-        task_query: -> { task }).build(server_state: { "selector" => "nebula" })
+        task_query: -> { task },
+        health_task_query: -> { { "TaskName" => "sns-multipost-health", "State" => "Ready" } }
+      ).build(server_state: { "selector" => "nebula" })
 
       assert_equal "ok", snapshot.fetch("status")
       assert_equal "Ready", snapshot.dig("task", "State")
       assert_equal 0, snapshot.dig("jobs", "recent_failed_count")
       assert_equal "nebula", snapshot.dig("server", "selector")
+      assert_equal true, snapshot.dig("health_task", "registered")
+      assert_equal "Ready", snapshot.dig("health_task", "State")
+    end
+  end
+
+  def test_reports_unregistered_health_scheduler_without_affecting_overall_status
+    Dir.mktmpdir do |root|
+      %w[done failed state].each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+      task = { "TaskName" => "sns-multipost", "State" => "Ready" }
+
+      snapshot = SnsMultipost::HealthSnapshot.new(
+        root: root, task_query: -> { task }, health_task_query: -> { nil }
+      ).build(server_state: {})
+
+      assert_equal "ok", snapshot.fetch("status")
+      assert_equal false, snapshot.dig("health_task", "registered")
     end
   end
 

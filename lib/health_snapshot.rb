@@ -7,12 +7,15 @@ require_relative "task_status"
 module SnsMultipost
   class HealthSnapshot
     def initialize(root:, task_name: "sns-multipost", clock: -> { Time.now }, task_query: nil,
+                   health_task_name: "sns-multipost-health", health_task_query: nil,
                    task_timeout: 10)
       @root = File.expand_path(root)
       @task_name = task_name
       @clock = clock
       @task_query = task_query || -> { TaskStatus.query(@task_name, timeout: task_timeout) }
       @custom_task_query = !task_query.nil?
+      @health_task_name = health_task_name
+      @health_task_query = health_task_query
       @task_timeout = task_timeout
       @task_mutex = Mutex.new
     end
@@ -28,6 +31,7 @@ module SnsMultipost
         "status" => overall_status(task, runner, history),
         "server_time" => now.iso8601,
         "server" => server_state,
+        "health_task" => safe_health_task,
         "task" => task,
         "runner" => runner,
         "jobs" => {
@@ -60,6 +64,23 @@ module SnsMultipost
       }
     rescue StandardError => e
       { "TaskName" => @task_name, "error" => e.message }
+    end
+
+    def safe_health_task
+      return { "TaskName" => @health_task_name, "registered" => nil } unless @health_task_query
+
+      status = Timeout.timeout(@task_timeout) { @health_task_query.call }
+      return { "TaskName" => @health_task_name, "registered" => false } unless status
+
+      { "registered" => true }.merge(status)
+    rescue Timeout::Error
+      {
+        "TaskName" => @health_task_name,
+        "registered" => nil,
+        "error" => "監視サーバー用Windowsタスクの状態取得が#{@task_timeout}秒以内に完了しませんでした"
+      }
+    rescue StandardError => e
+      { "TaskName" => @health_task_name, "registered" => nil, "error" => e.message }
     end
 
     def overall_status(task, runner, history)

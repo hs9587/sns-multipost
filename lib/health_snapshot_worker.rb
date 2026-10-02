@@ -6,14 +6,23 @@ require_relative "task_status"
 
 module SnsMultipost
   class HealthSnapshotWorker
-    def initialize(root:, task_name: "sns-multipost", clock: -> { Time.now },
+    def initialize(root:, task_name: "sns-multipost", health_task_name: "sns-multipost-health",
+                   clock: -> { Time.now },
                    monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
       @root = File.expand_path(root)
       @clock = clock
       @monotonic_clock = monotonic_clock
       @snapshot = HealthSnapshot.new(
         root: @root, task_name: task_name, clock: clock,
-        task_query: -> { TaskStatus.query_via_com(task_name) })
+        task_query: -> { TaskStatus.query_via_com(task_name) },
+        health_task_name: health_task_name,
+        health_task_query: lambda {
+          begin
+            TaskStatus.query_via_com(health_task_name)
+          rescue StandardError
+            nil
+          end
+        })
     end
 
     def run(parent_pid:, interval: 10)
