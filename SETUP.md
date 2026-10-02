@@ -3,6 +3,7 @@
 Windows 11 機への移設・認証・常駐運用手順。
 API組の移設とタスクスケジューラ運用は実施済み。Blogger画像、mixi、mixi2、Jotterは
 専用Chromeを使うため、移設先で初回ログインまたはセーブポイント設定を行う。
+WindowsにはRubyが標準搭載されていないため、事前準備は [READMEの動作環境](README.md#動作環境) を参照。
 
 1. git clone
 2. bundle install

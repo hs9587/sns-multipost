@@ -6,6 +6,22 @@
 旧 [SNS_multi_post](https://github.com/hs9587/SNS_multi_post)（Ruby+Selenium 世代）の後継として、
 「トリガ → ファイルキュー → 投稿実行」を分離した構成で作り直している。
 
+## 動作環境
+
+このツールはRuby製で、コマンド、Windowsタスクによる定期投稿、WEBrick監視サーバーの
+すべてにRubyが必要。WindowsにはRubyが標準搭載されていないため、先にインストールする。
+
+- Rubyの公式案内: [Rubyのインストール](https://www.ruby-lang.org/ja/documentation/installation/)
+- Windows向けインストーラー: [RubyInstaller for Windows](https://rubyinstaller.org/downloads/)
+- このリポジトリはWindows 11とRuby 3.3で運用・テストしている
+- Windowsでは、通常はRubyInstallerの64ビット版Ruby+Devkitを使い、インストール後に
+  `ruby --version` と `bundle --version` を確認する
+- リポジトリを取得したら `bundle install` で、WEBrick、Ferrum、テスト用ライブラリを導入する
+- Blogger / mixi / mixi2 / Jotter.meのブラウザ経路にはGoogle Chromeも必要
+
+Windows以外でもAPI部分はRubyで動作し得るが、専用Chrome操作とWindowsタスクスケジューラを
+含む現在の実運用・確認対象はWindows 11である。
+
 ## 主な要件
 
 - 入口は Fedibird。きっかけ投稿がそのまま Fedibird 投稿を兼ねる
@@ -16,7 +32,7 @@
 - 認証情報とブラウザ状態は Git に入れない
 - 基本実装は Ruby。ブラウザ操作ライブラリは対象サービスごとの実証結果で決める
 
-## 現在の状態（2026-09-08）
+## 現在の状態（2026-10-03）
 
 - Fedibird監視、ファイルキュー、投稿実行、失敗ジョブの再試行からなる基盤は実装・運用確認済み
 - Fedibird / Bluesky / Tumblr / Threads はAPIによる実投稿を確認済み
@@ -30,10 +46,14 @@
 - Windowsタスクスケジューラによる `watch` → `run_queue` の定期実行は稼働実績あり。`bin/task_run` が両方の終了コードを記録し、`bin/task` で状態確認、登録・解除、有効化・一時停止ができる
 - `bin/task en` / `bin/task dis` は、それぞれ `enable` / `disable` の短縮名として利用できる
 - `bin/task` は最後に記録した定期実行異常とdone最新時刻以降のfailedを表示し、`bin/failed_jobs` では古い保留分を含む履歴をページ指定して確認できる
+- WEBrickによる読み取り専用監視サーバーを実装済み。家庭内LANまたは既存VPN上の別端末から、投稿スケジューラ、直近の実行結果、未処理failed、監視サーバー自身の状態を確認できる
+- 監視サーバーは状態収集を別プロセスへ分離し、収集が遅延・停止してもHTTP受付を巻き込まない。`bin/health` で手動起動・停止と常時起動用Windowsタスクの登録・解除ができる
 - API通信は接続・読取り・書込みの時間上限を共通化し、安全に未送信と判断できる接続失敗と冪等な取得処理だけを自動再試行する
 - API応答待ち切れやブラウザ送信後の確認失敗は「投稿結果不明」として再試行を止め、投稿先の確認後に明示的に再試行または投稿済み解決を選べる
 - `watch` / `post` / `run_queue` / `retry` は共通ロックで直列化し、ジョブJSONと監視基準は一時ファイルから原子的に確定する。監視途中の停止後は同じバッチを再開し、完成済み投稿先のジョブを重複作成しない
 - mixi / mixi2 / Jotter.meは、画面要素の再取得、画像処理待ち、ログイン中アカウントと投稿個別画面の確認を強化済み。mixiは送信前の画像入力要素を再取得できない場合、投稿フォーム全体を再構築する
+- Jotter.meの復元再試行時は、終了しなかった専用Chromeのプロセスツリーを停止して、同じプロファイルの多重起動と残存タブを防ぐ
+- `bin/cleanup --dry-run` で削除候補を確認し、同じ条件の `--apply` で保護対象を残した清掃を実行できる
 - タイトル導出は、辞書に一致しない場合も先頭範囲内の句読点・空白で自然に切る
 - XはOAuth 1.0a認証まで確認済み。API課金は行わず、Web画面の自動操作も公式ルール上行わない
 
