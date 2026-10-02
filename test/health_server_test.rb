@@ -57,7 +57,13 @@ class HealthServerTest < Minitest::Test
     html = response.body
 
     assert_includes html, "<h2>投稿タスク</h2>"
-    assert_includes html, "スケジューラ状態"
+    assert_includes html, "投稿スケジューラ状態"
+    assert_includes html, "投稿スケジューラの前回実行"
+    assert_includes html, "投稿スケジューラの次回実行"
+    assert_includes html, "投稿処理ラッパー最終"
+    assert_includes html, "投稿処理で最後に記録した異常"
+    assert_includes html, "完了した投稿ジョブの最新"
+    assert_includes html, "未処理の失敗ジョブ"
     assert_includes html, "有効・待機中 (Ready)"
     assert_includes html, "<h2>監視サーバー</h2>"
     assert_includes html, "常時起動用スケジューラ"

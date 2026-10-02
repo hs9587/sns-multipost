@@ -152,13 +152,13 @@ module SnsMultipost
         <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>
         <h2>投稿タスク</h2>
         <dl>
-          <dt>スケジューラ状態</dt><dd>#{h(task_state(task))}</dd>
-          <dt>前回実行</dt><dd>#{h(format_time(task["LastRunTime"]))}</dd>
-          <dt>次回実行</dt><dd>#{h(format_time(task["NextRunTime"]))}</dd>
-          <dt>定期実行ラッパー</dt><dd>#{h(format_time(last_run["at"]))} / watch=#{h(last_run["watch_exit"])} run_queue=#{h(last_run["run_queue_exit"])} overall=#{h(last_run["overall_exit"])}</dd>
-          <dt>最後に記録した異常</dt><dd>#{h(format_time(last_failure["at"]))}#{format_failure(last_failure)}</dd>
-          <dt>done最新</dt><dd>#{h(jobs["latest_done"] || "なし")}</dd>
-          <dt>最近のfailed</dt><dd>#{h(jobs["recent_failed_count"])}件</dd>
+          <dt>投稿スケジューラ状態</dt><dd>#{h(task_state(task))}</dd>
+          <dt>投稿スケジューラの前回実行</dt><dd>#{h(format_time(task["LastRunTime"]))}</dd>
+          <dt>投稿スケジューラの次回実行</dt><dd>#{h(format_time(task["NextRunTime"]))}</dd>
+          <dt>投稿処理ラッパー最終</dt><dd>#{h(format_time(last_run["at"]))} / watch=#{h(last_run["watch_exit"])} run_queue=#{h(last_run["run_queue_exit"])} overall=#{h(last_run["overall_exit"])}</dd>
+          <dt>投稿処理で最後に記録した異常</dt><dd>#{h(format_time(last_failure["at"]))}#{format_failure(last_failure)}</dd>
+          <dt>完了した投稿ジョブの最新</dt><dd>#{h(jobs["latest_done"] || "なし")}</dd>
+          <dt>未処理の失敗ジョブ</dt><dd>#{h(jobs["recent_failed_count"])}件</dd>
         </dl>
         #{failed.empty? ? "" : "<ul>#{failed}</ul>"}
         #{failed_count.positive? ? "<p>再投稿する場合は、重複を避けるため投稿済みでないことを確認してから<code>retry</code>してください。</p>" : ""}
