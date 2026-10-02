@@ -146,7 +146,19 @@ module SnsMultipost
         <!doctype html>
         <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
         <title>sns-multipost 状態</title>
-        <style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:2rem auto;padding:0 1rem;line-height:1.6}dt{font-weight:700}dd{margin:0 0 .5rem 1rem}.ok{color:#087830}.failed,.error{color:#b42318}.disabled{color:#8a5700}code{word-break:break-all}</style>
+        <style>
+        body{font-family:system-ui,sans-serif;max-width:56rem;margin:2rem auto;padding:0 1rem;line-height:1.6}
+        h2{margin:1.5rem 0 .5rem}
+        dl{display:grid;grid-template-columns:minmax(14rem,19rem) minmax(0,1fr);gap:.25rem 1rem;margin:.5rem 0 1rem}
+        dt{font-weight:700}
+        dd{min-width:0;margin:0;overflow-wrap:anywhere}
+        .ok{color:#087830}.failed,.error{color:#b42318}.disabled{color:#8a5700}
+        code{word-break:break-all}
+        @media(max-width:42rem){
+          dl{grid-template-columns:1fr;gap:0}
+          dd{margin:0 0 .6rem .75rem}
+        }
+        </style>
         </head><body>
         <h1>sns-multipost 状態</h1>
         <p class="#{h(status)}"><strong>#{h(status_label(status, failed_count: failed_count))}</strong></p>

@@ -88,6 +88,15 @@ class HealthServerTest < Minitest::Test
     refute_includes response["Content-Security-Policy"], "script-src 'unsafe-inline'"
   end
 
+  def test_uses_compact_definition_list_layout_with_mobile_fallback
+    html = response_for("GET", "/").body
+
+    assert_includes html, "dl{display:grid"
+    assert_includes html, "grid-template-columns:minmax(14rem,19rem) minmax(0,1fr)"
+    assert_includes html, "@media(max-width:42rem)"
+    assert_includes html, "dl{grid-template-columns:1fr"
+  end
+
   def test_labels_unregistered_health_scheduler
     @snapshot["health_task"] = {
       "TaskName" => "sns-multipost-health", "registered" => false
