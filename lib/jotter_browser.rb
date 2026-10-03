@@ -488,7 +488,7 @@ module SnsMultipost
         end
         @sleeper.call(0.2)
       end
-      status("Jotter: 投稿確認Ok #{clicked}回") if clicked.positive?
+      status("Jotter: 確認ダイアログのOKを#{clicked}回押下") if clicked.positive?
       clicked
     end
 
