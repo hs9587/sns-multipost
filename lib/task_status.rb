@@ -142,15 +142,27 @@ module SnsMultipost
     def set_enabled(task_name, enabled:, capture3: Open3.method(:capture3))
       escaped_name = task_name.gsub("'", "''")
       command = enabled ? "Enable-ScheduledTask" : "Disable-ScheduledTask"
+      desired_state = enabled ? "enabled" : "disabled"
       script = <<~POWERSHELL
         $ErrorActionPreference = 'Stop'
         [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-        #{command} -TaskName '#{escaped_name}' | Out-Null
+        $task = Get-ScheduledTask -TaskName '#{escaped_name}'
+        $alreadyDesired = if ('#{desired_state}' -eq 'enabled') {
+          @('Ready', 'Running', 'Queued').Contains($task.State.ToString())
+        } else {
+          $task.State.ToString() -eq 'Disabled'
+        }
+        if ($alreadyDesired) {
+          [Console]::Out.Write('unchanged')
+        } else {
+          #{command} -TaskName '#{escaped_name}' | Out-Null
+          [Console]::Out.Write('changed')
+        }
       POWERSHELL
-      _stdout, stderr, status = capture3.call(
+      stdout, stderr, status = capture3.call(
         "powershell.exe", "-NoProfile", "-NonInteractive",
         "-ExecutionPolicy", "Bypass", "-Command", script)
-      return true if status.success?
+      return utf8(stdout).strip == "changed" if status.success?
 
       message = utf8(stderr).strip
       message = "終了コード#{status.exitstatus}" if message.empty?

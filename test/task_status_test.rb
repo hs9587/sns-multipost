@@ -107,7 +107,7 @@ class TaskStatusTest < Minitest::Test
     scripts = []
     capture3 = lambda do |*_args|
       scripts << _args.last
-      ["", "", FakeStatus.new(true, 0)]
+      ["changed", "", FakeStatus.new(true, 0)]
     end
 
     assert SnsMultipost::TaskStatus.set_enabled(
@@ -116,6 +116,16 @@ class TaskStatusTest < Minitest::Test
       "sns-multipost", enabled: false, capture3: capture3)
     assert_includes scripts[0], "Enable-ScheduledTask -TaskName 'sns-multipost'"
     assert_includes scripts[1], "Disable-ScheduledTask -TaskName 'sns-multipost'"
+    assert_includes scripts[0], "Get-ScheduledTask -TaskName 'sns-multipost'"
+  end
+
+  def test_set_enabled_reports_unchanged_when_task_is_already_in_requested_state
+    capture3 = lambda do |*_args|
+      ["unchanged", "", FakeStatus.new(true, 0)]
+    end
+
+    refute SnsMultipost::TaskStatus.set_enabled(
+      "sns-multipost", enabled: true, capture3: capture3)
   end
 
   def test_set_enabled_escapes_single_quote_in_task_name

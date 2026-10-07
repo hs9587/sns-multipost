@@ -79,6 +79,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "--minutes N"
     assert_includes stdout, "省略すると状態を読み取るだけ"
     assert_includes stdout, "タスク登録だけを解除"
+    assert_includes stdout, "すでに希望する状態なら変更せず"
     assert_includes stdout, "実行中の処理は強制終了しません"
   end
 

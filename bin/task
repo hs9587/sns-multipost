@@ -24,6 +24,7 @@ parser = SnsMultipost::Cli.parser(
           "registerの既定はリポジトリ内の bin/task_run を現在のRubyで10分間隔に実行します。",
           "registerは同名タスクを上書きして有効化し、バッテリ動作と多重起動防止を設定します。",
           "unregisterはタスク登録だけを解除し、バッチ、ログ、ジョブは削除しません。",
+          "enable/enとdisable/disは、すでに希望する状態なら変更せず状態だけを表示します。",
           "切替後も現在の状態、次回・前回実行時刻、前回結果を表示します。",
           "状態表示ではdone最新と同時刻以降のfailedを最大3件示します。自動判定や再投稿はしません。",
           "disableは今後の起動を止めますが、すでに実行中の処理は強制終了しません。"]
@@ -66,8 +67,13 @@ begin
     puts "バッチ、ログ、queue、failed、doneは削除していません。"
     exit 0
   when "enable", "disable"
-    SnsMultipost::TaskStatus.set_enabled(task_name, enabled: action == "enable")
-    puts "変更: #{action == 'enable' ? '有効化' : '一時停止'}"
+    enabled = action == "enable"
+    changed = SnsMultipost::TaskStatus.set_enabled(task_name, enabled: enabled)
+    if changed
+      puts "変更: #{enabled ? '有効化' : '一時停止'}"
+    else
+      puts "変更なし: すでに#{enabled ? '有効' : '一時停止'}"
+    end
   end
   puts SnsMultipost::TaskStatus.format(SnsMultipost::TaskStatus.query(task_name))
   root = File.expand_path("..", __dir__)
