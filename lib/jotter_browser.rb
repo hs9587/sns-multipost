@@ -22,12 +22,16 @@ module SnsMultipost
     AUTH_TIMEOUT = 40
 
     LOGGED_IN_JS = <<~'JS'.freeze
-      (() => ({
-        loggedIn: !location.pathname.includes('/welcome') &&
-          !!document.querySelector('a[href="/ja-JP/wallet/"]') &&
-          !!document.querySelector('input[type="image"].user-face'),
-        home: location.pathname === '/ja-JP/' && !location.hash
-      }))()
+      (() => {
+        const welcome = location.pathname.includes('/welcome');
+        const hasWallet = !!document.querySelector('a[href="/ja-JP/wallet/"]');
+        const hasUserFace = !!document.querySelector('input[type="image"].user-face');
+        return {
+          loggedIn: !welcome && hasWallet && hasUserFace,
+          sessionReady: !welcome && hasWallet,
+          home: location.pathname === '/ja-JP/' && !location.hash
+        };
+      })()
     JS
 
     HOME_RESET_JS = <<~'JS'.freeze
@@ -726,16 +730,31 @@ module SnsMultipost
       goto_safely(HOME_URL)
       ready = wait_for(timeout: [@auth_timeout, 10].min) do
         state = safe_evaluate(LOGGED_IN_JS)
-        state && state["loggedIn"] && state["home"]
+        state if authenticated_home_state?(state)
       end
-      return true if ready
+      if ready
+        report_partial_home_session(ready)
+        return true
+      end
 
       status("Jotter: 本人確認画面を閉じるためホームを再読込")
       safe_evaluate(HOME_RESET_JS)
-      wait_for(timeout: @auth_timeout) do
+      ready = wait_for(timeout: @auth_timeout) do
         state = safe_evaluate(LOGGED_IN_JS)
-        state && state["loggedIn"] && state["home"]
+        state if authenticated_home_state?(state)
       end
+      report_partial_home_session(ready) if ready
+      !!ready
+    end
+
+    def authenticated_home_state?(state)
+      state && state["home"] && (state["loggedIn"] || state["sessionReady"])
+    end
+
+    def report_partial_home_session(state)
+      return if state["loggedIn"]
+
+      status("Jotter: ログインUIは一部読込中ですがセッションを確認")
     end
 
     def status(message)
