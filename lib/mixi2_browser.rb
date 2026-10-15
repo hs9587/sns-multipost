@@ -10,6 +10,8 @@ module SnsMultipost
     SUBMIT_SELECTOR = 'button[type="submit"][aria-label="送信"]'.freeze
     POST_BUTTON_XPATH = '//button[normalize-space(.)="ポスト"]'.freeze
     MEDIA_SETTLE_SECONDS = 30
+    NODE_ACTION_ATTEMPTS = 4
+    NODE_ACTION_RETRY_SECONDS = 0.5
 
     STATE_JS = <<~'JS'.freeze
       (() => {
@@ -154,16 +156,16 @@ module SnsMultipost
 
     def post(text:, media_paths: [], failure_screenshot_path: nil)
       submission_started = false
-      state, _, composer = open_composer
+      state, = open_composer
       account_handle = state["accountHandle"]
 
-      editor = composer.at_css(EDITOR_SELECTOR)
-      raise "mixi2の本文欄が見つかりません" unless editor
-      editor.click.type(text)
+      with_fresh_composer_node(EDITOR_SELECTOR, "mixi2の本文欄が見つかりません") do |editor|
+        editor.click.type(text)
+      end
 
       unless media_paths.empty?
         media_paths.each do |path|
-          attach_media(composer, path)
+          attach_media(path)
         end
       end
 
@@ -172,10 +174,10 @@ module SnsMultipost
 
       existing_urls = browser.evaluate(POST_URLS_JS, text[0, 40], account_handle)
 
-      submit = composer.at_css(SUBMIT_SELECTOR)
-      raise "mixi2の送信ボタンが見つかりません" unless submit
+      with_fresh_composer_node(SUBMIT_SELECTOR, "mixi2の送信ボタンが見つかりません") do |submit|
+        submit.click
+      end
       submission_started = true
-      submit.click
 
       closed = wait_for { !browser.evaluate(COMPOSER_JS)["opened"] }
       raise "mixi2の投稿完了を確認できません" unless closed
@@ -223,8 +225,8 @@ module SnsMultipost
     JS
 
     def media_smoke(media_path)
-      _, _, composer = open_composer
-      state = attach_media(composer, media_path)
+      open_composer
+      state = attach_media(media_path)
       raise "mixi2の投稿画面を閉じられません" unless browser.evaluate(CLOSE_COMPOSER_JS)
       state
     ensure
@@ -249,15 +251,12 @@ module SnsMultipost
         raise "mixi2のログイン中アカウントを確認できません"
       end
 
-      post_button = wait_for do
-        browser.xpath(POST_BUTTON_XPATH).find do |candidate|
-          candidate.evaluate("this.getClientRects().length > 0")
-        rescue StandardError
-          false
-        end
+      with_fresh_node(
+        -> { visible_post_button },
+        "mixi2のポストボタンが見つかりません"
+      ) do |post_button|
+        post_button.click
       end
-      raise "mixi2のポストボタンが見つかりません" unless post_button
-      post_button.click
       last_composer = nil
       composer = wait_for do
         last_composer = browser.evaluate(COMPOSER_JS)
@@ -269,6 +268,14 @@ module SnsMultipost
       raise "mixi2の表示中投稿ダイアログを特定できません" unless composer_node
 
       [state, composer, composer_node]
+    end
+
+    def visible_post_button
+      browser.xpath(POST_BUTTON_XPATH).find do |candidate|
+        candidate.evaluate("this.getClientRects().length > 0")
+      rescue StandardError
+        false
+      end
     end
 
     def active_composer_node
@@ -283,12 +290,12 @@ module SnsMultipost
       end
     end
 
-    def attach_media(composer, path)
+    def attach_media(path)
       before = browser.evaluate(ATTACHMENT_STATE_JS)
-      media = composer.at_css(MEDIA_SELECTOR)
-      raise "mixi2のメディア入力が見つかりません" unless media
       baseline_connections = browser.network.pending_connections
-      media.select_file(path)
+      with_fresh_composer_node(MEDIA_SELECTOR, "mixi2のメディア入力が見つかりません") do |media|
+        media.select_file(path)
+      end
       @sleeper.call(0.2)
       attached = wait_for do
         state = browser.evaluate(ATTACHMENT_STATE_JS)
@@ -304,6 +311,35 @@ module SnsMultipost
           # 投稿用データとして画像を取り込むまで時間がかかることがある。
           @sleeper.call(MEDIA_SETTLE_SECONDS)
       attached
+    end
+
+    def with_fresh_composer_node(selector, missing_message, &block)
+      with_fresh_node(
+        -> { active_composer_node&.at_css(selector) },
+        missing_message,
+        &block
+      )
+    end
+
+    def with_fresh_node(finder, missing_message)
+      last_error = nil
+      NODE_ACTION_ATTEMPTS.times do
+        begin
+          node = wait_for { finder.call }
+          raise missing_message unless node
+          return yield node
+        rescue StandardError => e
+          raise unless node_not_found_error?(e)
+
+          last_error = e
+          @sleeper.call(NODE_ACTION_RETRY_SECONDS)
+        end
+      end
+      raise last_error
+    end
+
+    def node_not_found_error?(error)
+      error.class.name.end_with?("NodeNotFoundError")
     end
 
     def capture_failure_screenshot(path)

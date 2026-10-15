@@ -2,6 +2,8 @@ require_relative "test_helper"
 require "mixi2_browser"
 
 class Mixi2BrowserTest < Minitest::Test
+  class TransientNodeNotFoundError < StandardError; end
+
   class FakeNetwork
     attr_reader :wait_options
 
@@ -51,11 +53,12 @@ class Mixi2BrowserTest < Minitest::Test
     attr_reader :url, :quit_called, :text, :media_paths, :network,
                 :processing_checks, :post_url_args, :post_urls_args
 
-    def initialize(post_url: true, processing_checks: 0)
+    def initialize(post_url: true, processing_checks: 0, stale_actions: [])
       @composer_open = false
       @submitted = false
       @post_url = post_url
       @processing_checks = processing_checks
+      @stale_actions = stale_actions.dup
       @network = FakeNetwork.new
     end
 
@@ -97,17 +100,29 @@ class Mixi2BrowserTest < Minitest::Test
     def at_css(selector)
       case selector
       when SnsMultipost::Mixi2Browser::EDITOR_SELECTOR
-        FakeNode.new(on_type: ->(text) { @text = text })
+        FakeNode.new(
+          on_click: -> { raise_stale_once(:editor) },
+          on_type: ->(text) { @text = text })
       when SnsMultipost::Mixi2Browser::MEDIA_SELECTOR
-        FakeNode.new(on_select_file: ->(path) { (@media_paths ||= []) << path })
+        FakeNode.new(on_select_file: ->(path) {
+          raise_stale_once(:media)
+          (@media_paths ||= []) << path
+        })
       when SnsMultipost::Mixi2Browser::SUBMIT_SELECTOR
-        FakeNode.new(on_click: -> { @submitted = true; @composer_open = false })
+        FakeNode.new(on_click: -> {
+          raise_stale_once(:submit)
+          @submitted = true
+          @composer_open = false
+        })
       end
     end
 
     def xpath(selector)
       return [] unless selector == SnsMultipost::Mixi2Browser::POST_BUTTON_XPATH
-      [FakeNode.new(on_click: -> { @composer_open = true })]
+      [FakeNode.new(on_click: -> {
+        raise_stale_once(:post_button)
+        @composer_open = true
+      })]
     end
 
     def css(selector)
@@ -128,6 +143,16 @@ class Mixi2BrowserTest < Minitest::Test
     end
 
     attr_reader :screenshot_call
+
+    private
+
+    def raise_stale_once(action)
+      index = @stale_actions.index(action)
+      return unless index
+
+      @stale_actions.delete_at(index)
+      raise TransientNodeNotFoundError, "stale #{action}"
+    end
   end
 
   def test_smoke_checks_login_and_composer_without_posting
@@ -176,6 +201,18 @@ class Mixi2BrowserTest < Minitest::Test
     assert_equal "@me", result[:account]
     assert_equal ["おはようございます", "me"], browser.post_urls_args
     assert_equal ["おはようございます", [], "me"], browser.post_url_args
+  end
+
+  def test_post_refinds_nodes_after_transient_dom_replacement
+    browser = FakeBrowser.new(stale_actions: %i[post_button editor media submit])
+
+    result = SnsMultipost::Mixi2Browser.new(
+      browser: browser, timeout: 0, sleeper: ->(_seconds) {}).post(
+        text: "差し替えテスト", media_paths: ["one.jpg"])
+
+    assert_equal "差し替えテスト", browser.text
+    assert_equal ["one.jpg"], browser.media_paths
+    assert result[:posted]
   end
 
   def test_post_rejects_session_without_identifiable_account
