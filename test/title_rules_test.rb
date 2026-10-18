@@ -92,6 +92,23 @@ class TitleRulesTest < Minitest::Test
                  @rules.title_for("デミキノコハンバーグ、ダイコンサラダ、混ぜご飯。")
   end
 
+  def test_bento_uses_canonical_title
+    assert_equal "弁当",
+                 @rules.title_for("銀鮭の粗ほぐし弁当、鱧ほかのお吸い物。")
+  end
+
+  def test_soba_variants_use_hiragana_canonical_title
+    %w[そば 蕎麦 ソバ].each do |variant|
+      assert_equal "そば", @rules.title_for("天麩羅#{variant}。")
+    end
+  end
+
+  def test_udon_variants_use_hiragana_canonical_title
+    %w[うどん 饂飩 ウドン].each do |variant|
+      assert_equal "うどん", @rules.title_for("鍋焼き#{variant}。")
+    end
+  end
+
   def test_coffee_still_wins_over_staple_food
     assert_equal "アイス",
                  @rules.title_for("クッキーデニッシュ シトラス&チーズ、アイス デカフェコーヒー。")
