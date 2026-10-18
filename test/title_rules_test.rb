@@ -52,6 +52,17 @@ class TitleRulesTest < Minitest::Test
                  @rules.title_for("和栗のモンブラン、アイスルイボスティー。")
   end
 
+  def test_iced_and_hot_milk_are_not_coffee
+    assert_equal "キッシュロレーヌ",
+                 @rules.title_for("キッシュロレーヌ、バジルチキンサラダ、アイスミルク。")
+    assert_equal "リンゴのキャラメルブリオ…",
+                 @rules.title_for("リンゴのキャラメルブリオッシュ、ホットミルク。")
+  end
+
+  def test_explicit_coffee_still_wins_with_milk
+    assert_equal "アイス", @rules.title_for("アイスコーヒー、ミルク。")
+  end
+
   def test_explicit_coffee_word_wins_even_with_tea
     # コーヒーの明確な語があればお茶が同居してもコーヒー
     assert_equal "アイス", @rules.title_for("アイスコーヒーとアイスティー")
