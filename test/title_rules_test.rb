@@ -74,6 +74,13 @@ class TitleRulesTest < Minitest::Test
                  @rules.title_for("ハッシュドビーフライス、ハムコールスローサラダ。")
   end
 
+  def test_kanji_rice_uses_hiragana_canonical_title
+    assert_equal "ごはん",
+                 @rules.title_for("ベーコンサラダ、サーモン、サトイモみそ、炊き込みご飯。")
+    assert_equal "ごはん",
+                 @rules.title_for("デミキノコハンバーグ、ダイコンサラダ、混ぜご飯。")
+  end
+
   def test_coffee_still_wins_over_staple_food
     assert_equal "アイス",
                  @rules.title_for("クッキーデニッシュ シトラス&チーズ、アイス デカフェコーヒー。")

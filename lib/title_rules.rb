@@ -37,7 +37,20 @@ module SnsMultipost
     end
 
     def food(text)
-      first_in_text(text, @r["foods_priority"] || []) || first_in_text(text, @r["foods"])
+      aliases = @r["food_aliases"] || {}
+      first_food_in_text(text, @r["foods_priority"] || [], aliases) ||
+        first_food_in_text(text, @r["foods"] || [], aliases)
+    end
+
+    def first_food_in_text(text, words, aliases)
+      candidates = words.map { |word| [word, word] }
+      aliases.each do |variant, canonical|
+        candidates << [variant, canonical] if words.include?(canonical)
+      end
+      hits = candidates.filter_map do |variant, canonical|
+        (index = text.index(variant)) && [index, canonical]
+      end
+      hits.min_by(&:first)&.last
     end
 
     def first_in_text(text, words)
