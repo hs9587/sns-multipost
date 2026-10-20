@@ -397,6 +397,25 @@ class JotterBrowserTest < Minitest::Test
     assert_equal "270", result.dig("after", "balances", "available")
   end
 
+  def test_wallet_verify_continues_with_saved_profile_when_browser_id_is_hidden
+    browser = FakeBrowser.new(hide_browser_id: true)
+    expected = Digest::SHA256.hexdigest("jotter-wallet-v1\0browser-secret")[0, 12]
+
+    result = client(browser).wallet_verify(
+      required_den: 90, expected_browser_id_fingerprint: expected)
+
+    assert_equal "already_available", result["status"]
+  end
+
+  def test_wallet_verify_rejects_visible_mismatched_browser_id
+    error = assert_raises(RuntimeError) do
+      client(FakeBrowser.new).wallet_verify(
+        required_den: 90, expected_browser_id_fingerprint: "saved-reference")
+    end
+
+    assert_match(/保存済み基準と一致しません/, error.message)
+  end
+
   def test_den_shortage_recommends_waiting_when_needs_update_can_cover_cost
     state = {
       "balances" => {

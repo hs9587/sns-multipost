@@ -409,8 +409,10 @@ module SnsMultipost
       close_owned_browser
     end
 
-    def wallet_verify(required_den: 90, attempts: 3, verification_timeout: 180)
+    def wallet_verify(required_den: 90, attempts: 3, verification_timeout: 180,
+                      expected_browser_id_fingerprint: nil)
       state = open_wallet_state
+      verify_wallet_identity!(state, expected_browser_id_fingerprint) if expected_browser_id_fingerprint
       yield state if block_given?
       verify_wallet_den(state, required_den: required_den, attempts: attempts,
                         verification_timeout: verification_timeout)

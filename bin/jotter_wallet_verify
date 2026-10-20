@@ -11,7 +11,7 @@ timeout = 180
 required = 90
 parser = SnsMultipost::Cli.parser(
   banner: "Usage: ruby bin/jotter_wallet_verify [options]",
-  description: "sns-multipost専用ChromeでJotterの未検証DENへ検証要求し、利用可能になるまで待ちます。\n保存済みBrowser IDと一致する場合だけ実行し、送金・振替・投稿は行いません。",
+  description: "sns-multipost専用ChromeでJotterの未検証DENへ検証要求し、利用可能になるまで待ちます。\n表示されたBrowser IDが保存済み基準と一致する場合、またはID未表示でも確認済み専用プロファイルの場合だけ実行し、送金・振替・投稿は行いません。",
   examples: ["ruby bin/jotter_wallet_verify",
              "ruby bin/jotter_wallet_verify --required 90 --attempts 3 --timeout 180"],
   notes: ["Browser IDを表示するには、別機または普段のブラウザでも同じ口座のウォレットを開いたまま実行してください。",
@@ -45,13 +45,16 @@ client = SnsMultipost::JotterBrowser.new(
   logger: ->(message) { puts message })
 
 result = client.wallet_verify(
-  required_den: required, attempts: attempts, verification_timeout: timeout) do |initial|
+  required_den: required, attempts: attempts, verification_timeout: timeout,
+  expected_browser_id_fingerprint: expected) do |initial|
   current = fingerprint.call(initial["browserId"])
-  raise "Jotter Browser IDが画面に表示されず、専用ブラウザを確認できません" unless current
-  raise "Jotter Browser IDが保存済み基準と一致しません" unless current == expected
+  if current
+    puts "Browser ID: 保存済み基準と一致（fingerprint=#{current}）"
+  else
+    puts "Browser ID: 画面に未表示（確認済み専用プロファイルを継続使用）"
+  end
 
   balances = initial["balances"] || {}
-  puts "Browser ID: 保存済み基準と一致（fingerprint=#{current}）"
   puts "検証前DEN: 利用可能=#{balances['available'] || '不明'} " \
        "未検証=#{balances['unverified'] || '不明'} " \
        "要更新=#{balances['needsUpdate'] || '不明'} " \

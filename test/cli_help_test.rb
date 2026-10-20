@@ -210,7 +210,7 @@ class CliHelpTest < Minitest::Test
   def test_jotter_wallet_verify_help_explains_verification_only
     stdout, _stderr, status = run_cli("jotter_wallet_verify", "--help")
     assert status.success?
-    assert_includes stdout, "保存済みBrowser IDと一致する場合だけ"
+    assert_includes stdout, "ID未表示でも確認済み専用プロファイル"
     assert_includes stdout, "--required DEN"
     assert_includes stdout, "送金・振替・投稿は行いません"
   end
