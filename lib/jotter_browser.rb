@@ -224,6 +224,43 @@ module SnsMultipost
           const match = normalize(value).match(/-?[0-9][0-9,.]*/);
           return match ? match[0] : null;
         };
+        // Wide wallet layouts render the five labels first and their five
+        // values on the following visual row.  In that layout valueAfter()
+        // can mistake the first zero for several different balances.
+        const balanceDefinitions = {
+          available: definitions.available,
+          unverified: definitions.unverified,
+          needsUpdate: definitions.needsUpdate,
+          scheduled: definitions.scheduled,
+          total: definitions.total
+        };
+        const groupedBalances = (() => {
+          const labels = Object.entries(balanceDefinitions).map(([key, names]) => ({
+            key,
+            index: lines.findIndex((line) => names.includes(line))
+          }));
+          if (labels.some((entry) => entry.index < 0)) return null;
+          const indexes = labels.map((entry) => entry.index);
+          const first = Math.min(...indexes);
+          const last = Math.max(...indexes);
+          // Only use this fallback when the labels form one compact grid row.
+          if (last - first > labels.length + 2) return null;
+          const values = [];
+          for (let index = last + 1;
+               index < lines.length && values.length < labels.length;
+               index += 1) {
+            const line = lines[index];
+            if (/^-?[0-9][0-9,.]*$/.test(line)) values.push(numberFrom(line));
+            else if (values.length > 0) break;
+          }
+          if (values.length !== labels.length) return null;
+          const result = {};
+          labels.sort((left, right) => left.index - right.index)
+            .forEach((entry, index) => { result[entry.key] = values[index]; });
+          return result;
+        })();
+        const balanceValue = (key) => groupedBalances?.[key] ||
+          numberFrom(valueAfter(balanceDefinitions[key]));
         const relevant = [];
         lines.forEach((line, index) => {
           if (!allLabels.some((label) => line.includes(label))) return;
@@ -244,11 +281,11 @@ module SnsMultipost
           accountId,
           browserId,
           balances: {
-            available: numberFrom(valueAfter(definitions.available)),
-            unverified: numberFrom(valueAfter(definitions.unverified)),
-            needsUpdate: numberFrom(valueAfter(definitions.needsUpdate)),
-            scheduled: numberFrom(valueAfter(definitions.scheduled)),
-            total: numberFrom(valueAfter(definitions.total))
+            available: balanceValue('available'),
+            unverified: balanceValue('unverified'),
+            needsUpdate: balanceValue('needsUpdate'),
+            scheduled: balanceValue('scheduled'),
+            total: balanceValue('total')
           },
           diagnostic: relevant.slice(0, 30).map(mask)
         };

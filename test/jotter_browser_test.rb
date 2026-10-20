@@ -361,6 +361,15 @@ class JotterBrowserTest < Minitest::Test
     assert_equal 0, browser.confirm_clicks
   end
 
+  def test_wallet_state_supports_wide_grid_with_labels_before_values
+    script = SnsMultipost::JotterBrowser::WALLET_STATE_JS
+
+    assert_includes script, "groupedBalances"
+    assert_includes script, "labels form one compact grid row"
+    assert_includes script, "balanceValue('unverified')"
+    assert_includes script, "balanceValue('needsUpdate')"
+  end
+
   def test_wallet_hold_keeps_browser_open_during_block
     browser = FakeBrowser.new
     yielded = nil
