@@ -84,8 +84,35 @@ module SnsMultipost
 
     OPEN_COMPOSER_JS = <<~'JS'.freeze
       (() => {
-        const el = Array.from(document.querySelectorAll('nav input[type="button"]:not([title])'))
-          .find((node) => node.offsetWidth || node.offsetHeight);
+        if (document.querySelector('textarea[name="text"]')) return true;
+
+        const visible = (node) => node.offsetWidth || node.offsetHeight;
+        const labels = (node) => [
+          node.getAttribute('title'),
+          node.getAttribute('aria-label'),
+          node.getAttribute('value'),
+          node.getAttribute('alt'),
+          node.getAttribute('name'),
+          node.getAttribute('data-name'),
+          node.getAttribute('data-action'),
+          node.textContent
+        ].filter(Boolean).map((value) => value.trim().toLowerCase()).filter(Boolean);
+        const exactLabels = ['post', 'compose', 'write', '投稿'];
+        const phraseLabels = [
+          'メモを投稿', 'メモを作成します',
+          'create a jot', 'post a jot', 'write a jot'
+        ];
+        const controls = Array.from(document.querySelectorAll(
+          'nav input[type="button"], nav input[type="image"], nav button, nav a, nav [role="button"]'
+        )).filter(visible);
+        const labelled = controls.find((node) => {
+          const values = labels(node);
+          return values.some((value) => exactLabels.includes(value) ||
+            phraseLabels.some((candidate) => value.includes(candidate)));
+        });
+        const legacy = controls.find((node) =>
+          node.matches('input[type="button"]') && labels(node).length === 0);
+        const el = labelled || legacy;
         if (!el) return false;
         el.click();
         return true;

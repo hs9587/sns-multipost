@@ -207,6 +207,14 @@ class JotterBrowserTest < Minitest::Test
       sleeper: ->(_seconds) {})
   end
 
+  def test_composer_selector_supports_current_label_and_legacy_control
+    script = SnsMultipost::JotterBrowser::OPEN_COMPOSER_JS
+
+    assert_includes script, 'メモを作成します'
+    assert_includes script, "aria-label"
+    assert_includes script, "const legacy"
+  end
+
   def test_smoke_retries_until_expected_account_and_opens_public_composer
     browser = FakeBrowser.new(wrong_account_once: true)
     result = client(browser).smoke
