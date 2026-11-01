@@ -39,7 +39,8 @@ class JotterBrowserTest < Minitest::Test
                     home_requires_reset: false, confirmation_steps: 1, post_detail: true,
                     stale_actions: [], savepoint_account_panel: false,
                     account_requires_home_reset: false,
-                    partial_home_session_after_account: false)
+                    partial_home_session_after_account: false,
+                    loading_home_once: false)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
@@ -50,6 +51,7 @@ class JotterBrowserTest < Minitest::Test
       @savepoint_account_panel = savepoint_account_panel
       @account_requires_home_reset = account_requires_home_reset
       @partial_home_session_after_account = partial_home_session_after_account
+      @loading_home_once = loading_home_once
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -68,7 +70,8 @@ class JotterBrowserTest < Minitest::Test
     def evaluate(script, *_args)
       case script
       when SnsMultipost::JotterBrowser::LOGGED_IN_JS
-        session_ready = !@home_requires_reset || @home_reset
+        session_ready = (!@home_requires_reset &&
+          !(@loading_home_once && !@home_reset)) || @home_reset
         partial = @partial_home_session_after_account && @account_was_opened
         { "loggedIn" => session_ready && !partial,
           "sessionReady" => session_ready,
@@ -76,7 +79,10 @@ class JotterBrowserTest < Minitest::Test
       when SnsMultipost::JotterBrowser::HOME_RESET_JS
         @home_reset = true
       when SnsMultipost::JotterBrowser::SAVEPOINT_READY_JS
-        if @savepoint_account_panel
+        if @loading_home_once && !@home_reset
+          { "ready" => false, "sessionReady" => false, "loadingHome" => true,
+            "hasWallet" => false, "hasUserFace" => false }
+        elsif @savepoint_account_panel
           { "ready" => false, "sessionReady" => true, "hasWallet" => true,
             "hasUserFace" => false }
         else
@@ -280,6 +286,28 @@ class JotterBrowserTest < Minitest::Test
     assert result["hasEditor"]
     assert_includes messages, "Jotter: 期待するアカウント表示名と一致"
     assert_includes messages, "Jotter: ログインUIは一部読込中ですがセッションを確認"
+  end
+
+  def test_smoke_recovers_authenticated_home_stuck_loading
+    browser = FakeBrowser.new(loading_home_once: true)
+    messages = []
+    jotter = SnsMultipost::JotterBrowser.new(
+      savepoint_url: "https://secret.example/savepoint",
+      account_name: "hs9587",
+      browser: browser,
+      timeout: 0,
+      auth_timeout: 0,
+      confirmation_timeout: 0,
+      wallet_browser_id_timeout: 0,
+      savepoint_settle_seconds: 0,
+      sleeper: ->(_seconds) {},
+      logger: ->(message) { messages << message })
+
+    result = jotter.smoke
+
+    assert result["hasEditor"]
+    assert_includes messages, "Jotter: ログイン済みホームが読み込み中のため再読込"
+    assert_includes messages, "Jotter: 読み込み中のホームを再表示"
   end
 
   def test_post_enters_text_selects_public_and_confirms_url

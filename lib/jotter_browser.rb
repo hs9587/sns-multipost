@@ -48,9 +48,14 @@ module SnsMultipost
         const hashPresent = location.hash !== '';
         const hasWallet = !!document.querySelector('a[href="/ja-JP/wallet/"]');
         const hasUserFace = !!document.querySelector('input[type="image"].user-face');
+        const bodyText = document.body?.innerText || '';
+        const loadingHome = !welcome && location.pathname === '/ja-JP/' &&
+          /(?:読み込み中|loading)/i.test(bodyText) &&
+          /[\(（]\s*You\s*[\)）]/i.test(bodyText);
         return {
           ready: !welcome && hasWallet && hasUserFace,
           sessionReady: !welcome && hasWallet,
+          loadingHome: loadingHome,
           welcome: welcome,
           hashPresent: hashPresent,
           hasWallet: hasWallet,
@@ -729,7 +734,8 @@ module SnsMultipost
         last_state = nil
         ready = wait_for(timeout: @auth_timeout) do
           last_state = safe_evaluate(SAVEPOINT_READY_JS)
-          last_state && (last_state["ready"] || last_state["sessionReady"])
+          last_state && (last_state["ready"] || last_state["sessionReady"] ||
+            last_state["loadingHome"])
         end
         unless ready
           status("Jotter: 復元完了後のホーム画面を確認できません")
@@ -744,7 +750,14 @@ module SnsMultipost
           end
           next
         end
-        if last_state["ready"]
+        if last_state["loadingHome"]
+          status("Jotter: ログイン済みホームが読み込み中のため再読込")
+          unless recover_loading_home
+            status("Jotter: 読み込み中のホームを回復できません")
+            next
+          end
+          status("Jotter: 読み込み中のホームを再表示")
+        elsif last_state["ready"]
           status("Jotter: 復元完了後のホーム画面を確認")
         else
           status("Jotter: ログイン済みの別画面を確認（ホーム復帰を試行）")
@@ -766,6 +779,18 @@ module SnsMultipost
       end
       suffix = @account_name.empty? ? "" : "（期待するアカウント: #{@account_name}）"
       raise "Jotterのセーブポイントを復元できません#{suffix}"
+    end
+
+    def recover_loading_home
+      safe_evaluate(HOME_RESET_JS)
+      status("Jotter: ホーム再読込後#{@savepoint_settle_seconds}秒間、暗号処理を待機")
+      @sleeper.call(@savepoint_settle_seconds)
+      ready = wait_for(timeout: @auth_timeout) do
+        state = safe_evaluate(LOGGED_IN_JS)
+        state if authenticated_home_state?(state)
+      end
+      report_partial_home_session(ready) if ready
+      !!ready
     end
 
     def correct_account?
