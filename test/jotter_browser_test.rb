@@ -40,7 +40,7 @@ class JotterBrowserTest < Minitest::Test
                     stale_actions: [], savepoint_account_panel: false,
                     account_requires_home_reset: false,
                     partial_home_session_after_account: false,
-                    loading_home_once: false)
+                    loading_home_once: false, wallet_zero_reads: 0)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
@@ -52,6 +52,7 @@ class JotterBrowserTest < Minitest::Test
       @account_requires_home_reset = account_requires_home_reset
       @partial_home_session_after_account = partial_home_session_after_account
       @loading_home_once = loading_home_once
+      @wallet_zero_reads = wallet_zero_reads
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -114,6 +115,19 @@ class JotterBrowserTest < Minitest::Test
         @post_detail && @url == "https://jotter.me/ja-JP/jot/#new" &&
           @typed_text.to_s.include?(_args.first.to_s)
       when SnsMultipost::JotterBrowser::WALLET_STATE_JS
+        if @wallet_zero_reads.positive?
+          @wallet_zero_reads -= 1
+          return {
+            "wallet" => true,
+            "accountId" => "account-secret",
+            "browserId" => @hide_browser_id ? nil : "browser-secret",
+            "balances" => {
+              "available" => "0", "unverified" => "0",
+              "needsUpdate" => "0", "scheduled" => "0", "total" => "0"
+            },
+            "diagnostic" => []
+          }
+        end
         if @den_verified
           return {
             "wallet" => true,
@@ -200,7 +214,7 @@ class JotterBrowserTest < Minitest::Test
     end
   end
 
-  def client(browser, account_name: "hs9587")
+  def client(browser, account_name: "hs9587", logger: nil)
     SnsMultipost::JotterBrowser.new(
       savepoint_url: "https://secret.example/savepoint",
       account_name: account_name,
@@ -210,6 +224,7 @@ class JotterBrowserTest < Minitest::Test
       confirmation_timeout: 0,
       wallet_browser_id_timeout: 0,
       savepoint_settle_seconds: 0,
+      logger: logger,
       sleeper: ->(_seconds) {})
   end
 
@@ -441,6 +456,32 @@ class JotterBrowserTest < Minitest::Test
       required_den: 90, expected_browser_id_fingerprint: expected)
 
     assert_equal "already_available", result["status"]
+  end
+
+  def test_wallet_verify_reloads_transient_all_zero_balances
+    browser = FakeBrowser.new(wallet_zero_reads: 2)
+    messages = []
+
+    result = client(browser, logger: ->(message) { messages << message }).wallet_verify(
+      required_den: 90)
+
+    assert_equal "already_available", result["status"]
+    assert_includes messages, "Jotter: ウォレット残高が全項目0のため再読込 1/3"
+    refute_includes messages, "Jotter: 再読込後もウォレット残高が全項目0"
+  end
+
+  def test_wallet_verify_preserves_shortage_after_all_zero_reload_attempts
+    browser = FakeBrowser.new(wallet_zero_reads: 10)
+    messages = []
+
+    error = assert_raises(RuntimeError) do
+      client(browser, logger: ->(message) { messages << message }).wallet_verify(
+        required_den: 90)
+    end
+
+    assert_match(/合計0/, error.message)
+    assert_includes messages, "Jotter: ウォレット残高が全項目0のため再読込 3/3"
+    assert_includes messages, "Jotter: 再読込後もウォレット残高が全項目0"
   end
 
   def test_wallet_verify_rejects_visible_mismatched_browser_id

@@ -17,6 +17,9 @@ module SnsMultipost
     CONFIRM_XPATH = "//button[normalize-space()='Ok' or normalize-space()='OK']".freeze
     MAX_POST_CONFIRMATIONS = 4
     NODE_ACTION_ATTEMPTS = 3
+    WALLET_ZERO_BALANCE_RELOAD_ATTEMPTS = 3
+    WALLET_RELOAD_SETTLE_SECONDS = 3
+    WALLET_BALANCE_KEYS = %w[available unverified needsUpdate scheduled total].freeze
     SAVEPOINT_ATTEMPTS = 4
     SAVEPOINT_SETTLE_SECONDS = 30
     AUTH_TIMEOUT = 40
@@ -710,6 +713,7 @@ module SnsMultipost
       # route itself becomes visible.
       @sleeper.call(2)
       state = safe_evaluate(WALLET_STATE_JS) || last_state
+      state = recover_zero_wallet_state(state)
       if require_browser_id && !state["browserId"]
         status("Jotter: Browser ID表示を最大#{@wallet_browser_id_timeout}秒待機")
         observed = wait_for(timeout: @wallet_browser_id_timeout) do
@@ -719,6 +723,37 @@ module SnsMultipost
         state = observed if observed
       end
       state
+    end
+
+    def recover_zero_wallet_state(state)
+      return state unless wallet_balances_all_zero?(state)
+
+      WALLET_ZERO_BALANCE_RELOAD_ATTEMPTS.times do |index|
+        status("Jotter: ウォレット残高が全項目0のため再読込 " \
+               "#{index + 1}/#{WALLET_ZERO_BALANCE_RELOAD_ATTEMPTS}")
+        goto_safely(WALLET_URL)
+        @sleeper.call(WALLET_RELOAD_SETTLE_SECONDS)
+        last_state = nil
+        recovered = wait_for(timeout: @auth_timeout) do
+          candidate = safe_evaluate(WALLET_STATE_JS)
+          next unless candidate && candidate["wallet"]
+
+          last_state = candidate
+          candidate unless wallet_balances_all_zero?(candidate)
+        end
+        return recovered if recovered
+
+        state = last_state if last_state
+      end
+      status("Jotter: 再読込後もウォレット残高が全項目0")
+      state
+    end
+
+    def wallet_balances_all_zero?(state)
+      balances = state && state["balances"]
+      return false unless balances.is_a?(Hash)
+
+      WALLET_BALANCE_KEYS.all? { |key| den_number(balances[key]).zero? }
     end
 
     def open_authenticated_home
