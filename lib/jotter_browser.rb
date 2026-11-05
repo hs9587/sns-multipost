@@ -418,9 +418,7 @@ module SnsMultipost
 
     def smoke
       open_authenticated_home
-      raise "Jotterの投稿フォームを開けません" unless wait_for(timeout: @auth_timeout) {
-        safe_evaluate(OPEN_COMPOSER_JS)
-      }
+      raise "Jotterの投稿フォームを開けません" unless open_composer_with_recovery
       editor = wait_for { safe_at_css(TEXT_SELECTOR) }
       submit = wait_for { safe_at_css(SUBMIT_SELECTOR) }
       public_option = safe_evaluate(SET_PUBLIC_JS)
@@ -460,9 +458,7 @@ module SnsMultipost
       raise "Jotter画像ファイルが見つかりません: #{path}" unless File.file?(absolute)
 
       open_authenticated_home
-      raise "Jotterの投稿フォームを開けません" unless wait_for(timeout: @auth_timeout) {
-        safe_evaluate(OPEN_COMPOSER_JS)
-      }
+      raise "Jotterの投稿フォームを開けません" unless open_composer_with_recovery
       wait_for { safe_at_css(TEXT_SELECTOR) } ||
         raise("Jotterの本文入力欄が見つかりません")
       raise "Jotterの公開範囲を「公開」にできません" unless safe_evaluate(SET_PUBLIC_JS)
@@ -500,9 +496,7 @@ module SnsMultipost
 
       return_to_home || raise("Jotterのホーム画面を確認できません")
       existing_urls = safe_evaluate(POST_URLS_JS) || []
-      raise "Jotterの投稿フォームを開けません" unless wait_for(timeout: @auth_timeout) {
-        safe_evaluate(OPEN_COMPOSER_JS)
-      }
+      raise "Jotterの投稿フォームを開けません" unless open_composer_with_recovery
 
       with_fresh_node(
         -> { safe_at_css(TEXT_SELECTOR) }, "Jotterの本文入力欄が見つかりません") do |editor|
@@ -787,7 +781,7 @@ module SnsMultipost
         end
         if last_state["loadingHome"]
           status("Jotter: ログイン済みホームが読み込み中のため再読込")
-          unless recover_loading_home
+          unless reload_authenticated_home
             status("Jotter: 読み込み中のホームを回復できません")
             next
           end
@@ -816,7 +810,7 @@ module SnsMultipost
       raise "Jotterのセーブポイントを復元できません#{suffix}"
     end
 
-    def recover_loading_home
+    def reload_authenticated_home
       safe_evaluate(HOME_RESET_JS)
       status("Jotter: ホーム再読込後#{@savepoint_settle_seconds}秒間、暗号処理を待機")
       @sleeper.call(@savepoint_settle_seconds)
@@ -826,6 +820,33 @@ module SnsMultipost
       end
       report_partial_home_session(ready) if ready
       !!ready
+    end
+
+    def open_composer_with_recovery
+      opened = wait_for(timeout: @auth_timeout) { safe_evaluate(OPEN_COMPOSER_JS) }
+      return true if opened
+
+      status("Jotter: 投稿フォームを開けないためホームを再読込")
+      unless reload_authenticated_home
+        status("Jotter: 投稿前のセッションを再確認できません")
+        return false
+      end
+      status("Jotter: 投稿前のセッションを再確認")
+      unless correct_account?
+        status("Jotter: 投稿前のアカウントを再確認できません")
+        return false
+      end
+
+      # Account verification can itself leave the account/network panel open.
+      # Reload once more so the retry starts from a clean home screen.
+      unless reload_authenticated_home
+        status("Jotter: アカウント再確認後のホームを表示できません")
+        return false
+      end
+      status("Jotter: 投稿フォームを再試行")
+      opened = wait_for(timeout: @auth_timeout) { safe_evaluate(OPEN_COMPOSER_JS) }
+      status("Jotter: ホーム再読込後に投稿フォームを確認") if opened
+      !!opened
     end
 
     def correct_account?

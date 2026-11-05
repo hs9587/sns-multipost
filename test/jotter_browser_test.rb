@@ -40,7 +40,8 @@ class JotterBrowserTest < Minitest::Test
                     stale_actions: [], savepoint_account_panel: false,
                     account_requires_home_reset: false,
                     partial_home_session_after_account: false,
-                    loading_home_once: false, wallet_zero_reads: 0)
+                    loading_home_once: false, wallet_zero_reads: 0,
+                    composer_open_failures: 0)
       @wrong_account_once = wrong_account_once
       @confirm_post = confirm_post
       @hide_browser_id = hide_browser_id
@@ -53,6 +54,7 @@ class JotterBrowserTest < Minitest::Test
       @partial_home_session_after_account = partial_home_session_after_account
       @loading_home_once = loading_home_once
       @wallet_zero_reads = wallet_zero_reads
+      @composer_open_failures = composer_open_failures
       @home_reset = false
       @goto_count = 0
       @account_open = false
@@ -101,6 +103,10 @@ class JotterBrowserTest < Minitest::Test
           "hs9587"
         end
       when SnsMultipost::JotterBrowser::OPEN_COMPOSER_JS
+        if @composer_open_failures.positive?
+          @composer_open_failures -= 1
+          return false
+        end
         @composer_open = true
       when SnsMultipost::JotterBrowser::SET_PUBLIC_JS
         @composer_open
@@ -333,6 +339,22 @@ class JotterBrowserTest < Minitest::Test
     assert_equal 1, browser.confirm_clicks
     assert_equal true, result[:posted]
     assert_equal "https://jotter.me/ja-JP/jot/#new", result[:url]
+  end
+
+  def test_post_reloads_home_and_retries_when_composer_does_not_open
+    browser = FakeBrowser.new(composer_open_failures: 1)
+    messages = []
+
+    result = client(browser, logger: ->(message) { messages << message }).post(
+      text: "投稿フォーム回復テスト")
+
+    assert result[:posted]
+    assert_equal "投稿フォーム回復テスト", browser.typed_text
+    assert_includes messages, "Jotter: 投稿フォームを開けないためホームを再読込"
+    assert_includes messages, "Jotter: 投稿前のセッションを再確認"
+    assert_includes messages, "Jotter: 期待するアカウント表示名と一致"
+    assert_includes messages, "Jotter: 投稿フォームを再試行"
+    assert_includes messages, "Jotter: ホーム再読込後に投稿フォームを確認"
   end
 
   def test_post_accepts_consecutive_confirmation_steps
