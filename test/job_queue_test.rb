@@ -52,6 +52,25 @@ class JobQueueTest < Minitest::Test
     end
   end
 
+  def test_deferred_job_is_hidden_until_retry_time
+    Dir.mktmpdir do |dir|
+      queue = SnsMultipost::JobQueue.new(dir)
+      queue.enqueue(SnsMultipost::Job.new(sns: "jotter", text: "t"))
+      job = queue.pending.first
+      retry_after = Time.new(2026, 11, 10, 6, 20, 0, "+09:00")
+
+      queue.defer(job, "temporary", retry_after: retry_after)
+
+      assert_empty queue.pending(now: retry_after - 1)
+      assert_equal [File.basename(job.path)],
+                   queue.deferred(now: retry_after - 1).map { |item| File.basename(item.path) }
+      assert_equal 1, queue.pending(now: retry_after).size
+      stored = JSON.parse(File.read(job.path))
+      assert_equal 1, stored["attempts"]
+      assert_equal retry_after.iso8601, stored["retry_after"]
+    end
+  end
+
   def test_resolve_as_posted_moves_unknown_job_to_done_without_queueing
     Dir.mktmpdir do |dir|
       queue = SnsMultipost::JobQueue.new(dir)

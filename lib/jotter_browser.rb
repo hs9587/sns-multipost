@@ -807,7 +807,7 @@ module SnsMultipost
         status("Jotter: 本人確認後のホーム再表示に失敗")
       end
       suffix = @account_name.empty? ? "" : "（期待するアカウント: #{@account_name}）"
-      raise "Jotterのセーブポイントを復元できません#{suffix}"
+      raise DeferredRetryError, "Jotterのセーブポイントを復元できません#{suffix}"
     end
 
     def reload_authenticated_home

@@ -61,6 +61,8 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "Bloggerは本文をAPI投稿"
     assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
     assert_includes stdout, "結果不明の投稿POSTは二重投稿防止のため再送しません"
+    assert_includes stdout, "Jotterの送信前セーブポイント復元失敗"
+    assert_includes stdout, "10分後の定期実行へ1回保留"
   end
 
   def test_task_help_explains_cross_shell_status_and_switches
@@ -81,6 +83,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "タスク登録だけを解除"
     assert_includes stdout, "すでに希望する状態なら変更せず"
     assert_includes stdout, "実行中の処理は強制終了しません"
+    assert_includes stdout, "安全な自動再試行を待っているジョブ"
   end
 
   def test_task_run_help_explains_exit_tracking

@@ -1,4 +1,7 @@
 module SnsMultipost
+  # The operation has not reached submission and is safe to retry later.
+  class DeferredRetryError < RuntimeError; end
+
   class DeliveryUnknownError < RuntimeError
     def self.wrap(error, context: nil)
       return error if error.is_a?(self)

@@ -2,12 +2,13 @@ require "json"
 require "securerandom"
 require "fileutils"
 require "digest"
+require "time"
 require_relative "atomic_file"
 
 module SnsMultipost
   class Job
     ATTRS = %w[sns text title media_paths media_urls source_url attempts last_error
-               delivery_state dedupe_key created_at].freeze
+               delivery_state dedupe_key created_at retry_after].freeze
     attr_accessor(*ATTRS.map(&:to_sym))
     attr_reader :path
 
@@ -45,9 +46,17 @@ module SnsMultipost
       path
     end
 
-    def pending
-      Dir[File.join(@root, "queue", "*.json")].sort.map do |p|
-        Job.new(JSON.parse(File.read(p)), path: p)
+    def pending(now: Time.now)
+      queued_jobs.reject do |job|
+        retry_at = deferred_until(job)
+        retry_at && retry_at > now
+      end
+    end
+
+    def deferred(now: Time.now)
+      queued_jobs.select do |job|
+        retry_at = deferred_until(job)
+        retry_at && retry_at > now
       end
     end
 
@@ -58,8 +67,17 @@ module SnsMultipost
     def fail(job, error)
       job.attempts += 1
       job.last_error = error.to_s
+      job.retry_after = nil
       AtomicFile.write(job.path, JSON.pretty_generate(job.to_h))
       move(job.path, "failed")
+    end
+
+    def defer(job, error, retry_after:)
+      job.attempts += 1
+      job.last_error = error.to_s
+      job.retry_after = retry_after.iso8601
+      AtomicFile.write(job.path, JSON.pretty_generate(job.to_h))
+      job.path
     end
 
     def requeue(path, confirmed_not_delivered: false)
@@ -81,6 +99,23 @@ module SnsMultipost
     end
 
     private
+
+    def queued_jobs
+      directory = File.join(@root, "queue")
+      Dir.children(directory).select { |name| name.end_with?(".json") }.sort.map do |name|
+        path = File.join(directory, name)
+        Job.new(JSON.parse(File.read(path)), path: path)
+      end
+    end
+
+    def deferred_until(job)
+      value = job.retry_after.to_s.strip
+      return nil if value.empty?
+
+      Time.iso8601(value)
+    rescue ArgumentError
+      nil
+    end
 
     def dedupe_suffix(key)
       Digest::SHA256.hexdigest(key.to_s)[0, 12]
