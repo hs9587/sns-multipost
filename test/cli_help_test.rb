@@ -62,7 +62,7 @@ class CliHelpTest < Minitest::Test
     assert_includes stdout, "Chromeを操作できるログオン中の実行環境"
     assert_includes stdout, "結果不明の投稿POSTは二重投稿防止のため再送しません"
     assert_includes stdout, "Jotterの送信前セーブポイント復元失敗"
-    assert_includes stdout, "10分後の定期実行へ1回保留"
+    assert_includes stdout, "30分後の定期実行へ1回保留"
   end
 
   def test_task_help_explains_cross_shell_status_and_switches

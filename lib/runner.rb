@@ -4,7 +4,7 @@ require_relative "delivery_error"
 
 module SnsMultipost
   class Runner
-    DEFERRED_RETRY_DELAY = 10 * 60
+    DEFERRED_RETRY_DELAY = 30 * 60
 
     def self.exit_status(results)
       results.any? { |result| result[1] == :failed } ? 1 : 0

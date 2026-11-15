@@ -6,6 +6,10 @@ require "poster/all"
 require "delivery_error"
 
 class RunnerTest < Minitest::Test
+  def test_default_deferred_retry_delay_is_thirty_minutes
+    assert_equal 30 * 60, SnsMultipost::Runner::DEFERRED_RETRY_DELAY
+  end
+
   def test_exit_status_is_zero_when_all_jobs_succeed
     results = [[Object.new, :ok, {}], [Object.new, :ok, {}]]
 
