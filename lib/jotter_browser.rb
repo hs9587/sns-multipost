@@ -993,8 +993,8 @@ module SnsMultipost
       end
     end
 
-    def wait_for_debugger(port)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 15
+    def wait_for_debugger(port, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+      deadline = monotonic_clock.call + 15
       uri = URI("http://127.0.0.1:#{port}/json/version")
       loop do
         begin
@@ -1005,7 +1005,9 @@ module SnsMultipost
         rescue StandardError
           # Chromeのデバッグポート起動待ち。
         end
-        raise "Jotter用Chromeの起動を確認できません" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        if monotonic_clock.call >= deadline
+          raise DeferredRetryError, "Jotter用Chromeの起動を確認できません"
+        end
         @sleeper.call(0.2)
       end
     end

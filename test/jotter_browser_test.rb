@@ -242,6 +242,18 @@ class JotterBrowserTest < Minitest::Test
     assert_includes script, "const legacy"
   end
 
+  def test_chrome_startup_timeout_is_safe_deferred_retry
+    browser = FakeBrowser.new
+    jotter = client(browser)
+    clock = [0, 16]
+
+    error = assert_raises(SnsMultipost::DeferredRetryError) do
+      jotter.send(:wait_for_debugger, 65_535, monotonic_clock: -> { clock.shift || 16 })
+    end
+
+    assert_equal "Jotter用Chromeの起動を確認できません", error.message
+  end
+
   def test_smoke_retries_until_expected_account_and_opens_public_composer
     browser = FakeBrowser.new(wrong_account_once: true)
     result = client(browser).smoke
